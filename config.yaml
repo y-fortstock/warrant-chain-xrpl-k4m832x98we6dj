@@ -1,2 +1,4 @@
 log:
   level: info 
+  # format: logfmt | json
+  format: logfmt 

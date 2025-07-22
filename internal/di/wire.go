@@ -16,9 +16,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ProvideLogger returns a new slog.Logger instance using the logger package and the provided log level.
-func ProvideLogger(level slog.Level) *slog.Logger {
-	return logger.NewLogger(level)
+// ProvideLogger returns a new slog.Logger instance using the logger package and the provided LoggerConfig.
+func ProvideLogger(cfg logger.LoggerConfig) *slog.Logger {
+	return logger.NewLogger(cfg)
 }
 
 // ProvideAccountAPI returns an implementation of the AccountAPIServer.
@@ -44,8 +44,8 @@ func ProvideAppServer(logger *slog.Logger, grpcServer *grpc.Server) *server.Serv
 	return server.NewServerWithGRPC(logger, grpcServer)
 }
 
-// InitializeServer creates and initializes a new application server using dependency injection and the provided log level.
-func InitializeServer(level slog.Level) *server.Server {
+// InitializeServer creates and initializes a new application server using dependency injection and the provided LoggerConfig.
+func InitializeServer(cfg logger.LoggerConfig) *server.Server {
 	wire.Build(
 		ProvideLogger,
 		ProvideAccountAPI,

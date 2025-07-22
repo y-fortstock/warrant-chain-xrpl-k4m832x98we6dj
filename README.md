@@ -51,6 +51,12 @@ Set the log level using the environment variable:
 LOG_LEVEL=debug ./chain-xrpl
 ```
 
+Set the log format using the environment variable:
+
+```
+LOG_FORMAT=json ./chain-xrpl
+```
+
 ### YAML Config
 
 Create a `config.yaml` file in the project root (or specify with `--config`). Example:
@@ -58,6 +64,7 @@ Create a `config.yaml` file in the project root (or specify with `--config`). Ex
 ```yaml
 log:
   level: info # or debug, warn, error
+  format: logfmt # or json
 ```
 
 ### CLI Flag
