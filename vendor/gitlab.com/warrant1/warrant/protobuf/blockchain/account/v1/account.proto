@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package blockchain.account.v1;
+
+option csharp_namespace = "Blockchain.Account.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1;accountv1";
+option java_multiple_files = true;
+option java_outer_classname = "AccountProto";
+option java_package = "com.blockchain.account.v1";
+option objc_class_prefix = "BAX";
+option php_namespace = "Blockchain\\Account\\V1";
+
+// Account data.
+message Account {
+  string id = 1;
+}

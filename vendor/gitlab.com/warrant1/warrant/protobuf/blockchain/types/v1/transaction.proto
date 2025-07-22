@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package blockchain.types.v1;
+
+option csharp_namespace = "Blockchain.Types.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/types/v1;typesv1";
+option java_multiple_files = true;
+option java_outer_classname = "TransactionProto";
+option java_package = "com.blockchain.types.v1";
+option objc_class_prefix = "BTX";
+option php_namespace = "Blockchain\\Types\\V1";
+
+// Event value params.
+message EventValue {
+    string name = 1;
+    string value = 2;
+}
+
+// Event object.
+message Event {
+    string name = 1;
+    string desc = 2;
+    string hex = 3;
+    string input = 4;
+    repeated EventValue values = 5;
+}
+
+// Transaction object.
+message Transaction {
+    string id = 1;
+    bytes block_number = 2;
+    uint64 block_time = 3;
+    uint64 block_count = 4;
+    bool fully_confirmed = 5;
+    bool is_success = 6;
+    uint64 gas_used = 7;
+    uint64 gas_price = 8;
+    string method = 9;
+    string input = 10;
+    repeated Event events = 11;
+}

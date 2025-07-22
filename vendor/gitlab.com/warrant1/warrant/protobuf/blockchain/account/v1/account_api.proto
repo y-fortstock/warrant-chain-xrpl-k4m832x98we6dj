@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package blockchain.account.v1;
+
+option csharp_namespace = "Blockchain.Account.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1;accountv1";
+option java_multiple_files = true;
+option java_outer_classname = "AccountApiProto";
+option java_package = "com.blockchain.account.v1";
+option objc_class_prefix = "BAX";
+option php_namespace = "Blockchain\\Account\\V1";
+
+import "blockchain/account/v1/account.proto";
+import "blockchain/types/v1/error.proto";
+import "blockchain/types/v1/transaction.proto";
+
+// Manages eth accounts.
+service AccountAPI {
+    // Create eth account whit password.
+    rpc Create (CreateRequest) returns (CreateResponse);
+    // Deposit ETH in wei from system account.
+    rpc Deposit (DepositRequest) returns (DepositResponse);
+    // Clear account balance.
+    rpc ClearBalance (ClearBalanceRequest) returns (ClearBalanceResponse);
+    // Get account balance.
+    rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message CreateRequest {
+    string password = 1;
+}
+
+message CreateResponse {
+    blockchain.types.v1.Error error = 1;
+    Account account = 2;
+}
+
+message DepositRequest {
+    string account_id = 1;
+    string wei_amount = 2;
+}
+
+message DepositResponse {
+    blockchain.types.v1.Error error = 1;
+    blockchain.types.v1.Transaction transaction = 2;
+}
+
+message ClearBalanceRequest {
+    string account_id = 1;
+    string account_password = 2;
+}
+
+message ClearBalanceResponse {
+    blockchain.types.v1.Error error = 1;
+    blockchain.types.v1.Transaction transaction = 2;
+    string returned_sum = 3;
+}
+
+message GetBalanceRequest {
+    string account_id = 1;
+}
+
+message GetBalanceResponse {
+    blockchain.types.v1.Error error = 1;
+    string balance = 2;
+}

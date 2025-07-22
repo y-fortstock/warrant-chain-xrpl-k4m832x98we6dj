@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+package blockchain.token.v1;
+
+option csharp_namespace = "Blockchain.Token.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1;tokenv1";
+option java_multiple_files = true;
+option java_outer_classname = "TokenApiProto";
+option java_package = "com.blockchain.token.v1";
+option objc_class_prefix = "BTX";
+option php_namespace = "Blockchain\\Token\\V1";
+
+import "blockchain/token/v1/token.proto";
+import "blockchain/types/v1/error.proto";
+import "blockchain/types/v1/transaction.proto";
+
+// Manages eth tokens.
+service TokenAPI {
+  // Create smart-contract.
+  rpc CreateContract(CreateContractRequest) returns (CreateContractResponse);
+  // Emission token.
+  rpc Emission(EmissionRequest) returns (EmissionResponse);
+  // Transfer token.
+  rpc Transfer(TransferRequest) returns (TransferResponse);
+  // TransferToCreditor transfer warrant from owner to creditor.
+  rpc TransferToCreditor(TransferToCreditorRequest) returns (TransferToCreditorResponse);
+  // BuyoutFromCreditor transfer warrant from creditor to owner.
+  rpc BuyoutFromCreditor(BuyoutFromCreditorRequest) returns (BuyoutFromCreditorResponse);
+  // TransferFromOwnerToWarehouse redeem token, transfer it from owner to warehouse.
+  rpc TransferFromOwnerToWarehouse(TransferFromOwnerToWarehouseRequest) returns (TransferFromOwnerToWarehouseResponse);
+  // TransferFromCreditorToWarehouse redeem token, transfer it from creditor to warehouse.
+  rpc TransferFromCreditorToWarehouse(TransferFromCreditorToWarehouseRequest) returns (TransferFromCreditorToWarehouseResponse);
+  // Initiate replacement.
+  rpc InitiateReplacement(InitiateReplacementRequest) returns (InitiateReplacementResponse);
+  // Prepare to replace.
+  rpc PrepareToReplace(PrepareToReplaceRequest) returns (PrepareToReplaceResponse);
+  // Replace.
+  rpc Replace(ReplaceRequest) returns (ReplaceResponse);
+  // Revert.
+  rpc RevertReplacement(RevertReplacementRequest) returns (RevertReplacementResponse);
+  // Transaction info.
+  rpc TransactionInfo(TransactionInfoRequest) returns (TransactionInfoResponse);
+  // Set address role.
+  rpc AddAddressRole(AddAddressRoleRequest) returns (AddAddressRoleResponse);
+  // Pause contract.
+  rpc PauseContract(PauseContractRequest) returns (PauseContractResponse);
+  // Resume contract.
+  rpc ResumeContract(ResumeContractRequest) returns (ResumeContractResponse);
+}
+
+message CreateContractRequest {
+  string name = 1;
+}
+
+message CreateContractResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message EmissionRequest {
+  string document_hash = 1;
+  string owner_address_id = 2;
+  string warehouse_address_id = 3;
+  string warehouse_pass = 4;
+  string signature = 5;
+}
+
+message EmissionResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message TransferRequest {
+  string document_hash = 1;
+  string receiver_address_id = 2;
+  string sender_address_id = 3;
+  string sender_pass = 4;
+  string signature = 5;
+}
+
+message TransferResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message TransferToCreditorRequest {
+  string document_hash = 1;
+  string owner_address_id = 2;
+  string owner_address_pass = 3;
+  string creditor_address_id = 4;
+  string signature = 5;
+}
+
+message TransferToCreditorResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message BuyoutFromCreditorRequest {
+  string document_hash = 1;
+  string owner_address_id = 2;
+  string creditor_address_id = 3;
+  string creditor_address_pass = 4;
+  string signature = 5;
+}
+
+message BuyoutFromCreditorResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message TransferFromOwnerToWarehouseRequest {
+  string document_hash = 1;
+  string owner_address_id = 2;
+  string owner_address_pass = 3;
+  string signature = 4;
+}
+
+message TransferFromOwnerToWarehouseResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message TransferFromCreditorToWarehouseRequest {
+  string document_hash = 1;
+  string creditor_address_id = 2;
+  string creditor_address_pass = 3;
+  string signature = 4;
+}
+
+message TransferFromCreditorToWarehouseResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message InitiateReplacementRequest {
+  string document_hash = 1;
+  string document_hash_replaced = 2;
+  string owner_address_id = 3;
+  string warehouse_address_id = 4;
+  string warehouse_pass = 5;
+  string signature = 6;
+}
+
+message InitiateReplacementResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message PrepareToReplaceRequest {
+  string document_hash = 1;
+  string document_hash_replaced = 2;
+  string owner_address_id = 3;
+  string creditor_address_id = 4;
+  string creditor_address_pass = 5;
+  string signature = 6;
+}
+
+message PrepareToReplaceResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message ReplaceRequest {
+  string document_hash = 1;
+  string document_hash_replaced = 2;
+  string owner_address_id = 3;
+  string owner_address_pass = 4;
+  string signature = 5;
+}
+
+message ReplaceResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message RevertReplacementRequest {
+  string document_hash = 1;
+  string document_hash_replaced = 2;
+}
+
+message RevertReplacementResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message AddAddressRoleRequest {
+  string address_id = 1;
+  string role = 2;
+}
+
+message AddAddressRoleResponse {
+  blockchain.types.v1.Error error = 1;
+  Token token = 2;
+}
+
+message TransactionInfoRequest {
+  string transaction_id = 1;
+}
+
+message TransactionInfoResponse {
+  blockchain.types.v1.Error error = 1;
+  blockchain.types.v1.Transaction transaction = 2;
+}
+
+message PauseContractRequest {
+}
+
+message PauseContractResponse {
+  blockchain.types.v1.Error error = 1;
+  blockchain.types.v1.Transaction transaction = 2;
+}
+
+message ResumeContractRequest {
+}
+
+message ResumeContractResponse {
+  blockchain.types.v1.Error error = 1;
+  blockchain.types.v1.Transaction transaction = 2;
+}

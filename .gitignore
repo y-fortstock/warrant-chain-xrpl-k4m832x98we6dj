@@ -1,0 +1,25 @@
+# Бинарники и временные файлы
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# сгенерированные файлы
+internal/di/wire_gen.go
+grpc/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Логи
+*.log
+
+# Vendor (если не требуется хранить в git)
+# vendor/ 

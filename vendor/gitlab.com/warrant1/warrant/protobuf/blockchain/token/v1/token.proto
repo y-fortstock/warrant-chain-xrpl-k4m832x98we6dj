@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package blockchain.token.v1;
+
+option csharp_namespace = "Blockchain.Token.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1;tokenv1";
+option java_multiple_files = true;
+option java_outer_classname = "TokenProto";
+option java_package = "com.blockchain.token.v1";
+option objc_class_prefix = "BTX";
+option php_namespace = "Blockchain\\Token\\V1";
+
+import "blockchain/types/v1/transaction.proto";
+
+// Token data.
+message Token {
+    string id = 1;
+    blockchain.types.v1.Transaction transaction = 2;
+    string contract = 3;
+}

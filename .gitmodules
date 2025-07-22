@@ -1,0 +1,3 @@
+[submodule "proto"]
+	path = proto
+	url = git@gitlab.com:warrant1/warrant/protobuf.git

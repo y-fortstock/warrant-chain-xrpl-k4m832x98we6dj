@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package blockchain.types.v1;
+
+option csharp_namespace = "Blockchain.Types.V1";
+option go_package = "gitlab.com/warrant1/warrant/protobuf/blockchain/types/v1;typesv1";
+option java_multiple_files = true;
+option java_outer_classname = "ErrorProto";
+option java_package = "com.blockchain.types.v1";
+option objc_class_prefix = "BTX";
+option php_namespace = "Blockchain\\Types\\V1";
+
+// Error code values.
+enum Err {
+  ERR_INVALID = 0;
+  ERR_CREATE_ACCOUNT = 1;
+}
+
+// Error version 2.
+message Error {
+  Err code = 1;
+  string description = 2;
+}
