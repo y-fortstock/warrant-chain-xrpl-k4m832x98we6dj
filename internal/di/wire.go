@@ -6,19 +6,19 @@ package di
 
 import (
 	"log/slog"
-	"os"
 
 	"github.com/google/wire"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/api"
+	"gitlab.com/warrant1/warrant/chain-xrpl/internal/logger"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/server"
 	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
 	tokenv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1"
 	"google.golang.org/grpc"
 )
 
-// ProvideLogger returns a new slog.Logger instance that writes to standard output.
+// ProvideLogger returns a new slog.Logger instance using the logger package.
 func ProvideLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(os.Stdout, nil))
+	return logger.NewLogger()
 }
 
 // ProvideAccountAPI returns an implementation of the AccountAPIServer.
