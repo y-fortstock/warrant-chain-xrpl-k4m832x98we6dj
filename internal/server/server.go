@@ -1,3 +1,4 @@
+// Package server provides the gRPC server implementation and related utilities.
 package server
 
 import (
@@ -12,11 +13,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Server represents the gRPC server and its logger.
 type Server struct {
 	grpcServer *grpc.Server
 	logger     *slog.Logger
 }
 
+// NewServer creates a new Server with its own gRPC server instance.
 func NewServer(logger *slog.Logger) *Server {
 	return &Server{
 		grpcServer: grpc.NewServer(),
@@ -24,6 +27,7 @@ func NewServer(logger *slog.Logger) *Server {
 	}
 }
 
+// NewServerWithGRPC creates a new Server using the provided gRPC server instance.
 func NewServerWithGRPC(logger *slog.Logger, grpcServer *grpc.Server) *Server {
 	return &Server{
 		grpcServer: grpcServer,
@@ -31,6 +35,7 @@ func NewServerWithGRPC(logger *slog.Logger, grpcServer *grpc.Server) *Server {
 	}
 }
 
+// Run starts the gRPC server on the specified address.
 func (s *Server) Run(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -40,7 +45,7 @@ func (s *Server) Run(addr string) error {
 	return s.grpcServer.Serve(lis)
 }
 
-// RunWithGracefulShutdown запускает gRPC сервер и обеспечивает graceful shutdown по завершению контекста или сигналу SIGINT/SIGTERM.
+// RunWithGracefulShutdown starts the gRPC server and performs graceful shutdown on context cancellation or SIGINT/SIGTERM signal.
 func (s *Server) RunWithGracefulShutdown(ctx context.Context, addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

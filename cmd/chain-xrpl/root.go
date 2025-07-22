@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/di"
@@ -13,11 +15,13 @@ var rootCmd = &cobra.Command{
 	Short: "XRPL blockchain service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		server := di.InitializeServer()
-		if err := server.Run(":50051"); err != nil {
+		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := server.RunWithGracefulShutdown(ctx, ":50051"); err != nil {
 			return err
 		}
 
-		return cmd.Help()
+		return nil
 	},
 }
 
