@@ -6,7 +6,9 @@ import (
 )
 
 // NewLogger returns a new slog.Logger instance that writes to standard output.
-// In the future, this can be extended to support configurable log levels and formats.
-func NewLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(os.Stdout, nil))
+// Accepts a slog.Level parameter to set the log level.
+func NewLogger(level slog.Level) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	}))
 }
