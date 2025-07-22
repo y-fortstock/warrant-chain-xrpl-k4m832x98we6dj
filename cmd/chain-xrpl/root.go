@@ -28,8 +28,11 @@ func initConfig() {
 		viper.AddConfigPath(".")
 	}
 
-	viper.SetEnvPrefix("LOG")
+	viper.SetEnvPrefix("CHAIN")
 	viper.AutomaticEnv()
+
+	// Bind specific environment variables to config keys
+	viper.BindEnv("log.level", "LOG_LEVEL")
 
 	// Set default
 	viper.SetDefault("log.level", "info")
