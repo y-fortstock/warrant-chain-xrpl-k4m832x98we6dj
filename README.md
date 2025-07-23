@@ -2,19 +2,25 @@
 
 ## Usage
 
+### Docker-based Workflow
+
+All development, build, and run operations are performed via Docker and Makefile. **You do not need to install Go or any dependencies locally**—just Docker and Make.
+
 ### Running the Application
 
-You can run the gRPC server using the CLI:
+Build and run the application in Docker:
 
 ```
-go run ./cmd/chain-xrpl
+make run
 ```
 
-Or build the binary and run it:
+This will:
+- Build the Docker image for chain-xrpl
+- Run the container on port 8099
 
+To stop the container:
 ```
-go build -o bin/chain-xrpl ./cmd/chain-xrpl
-./bin/chain-xrpl
+docker stop chain-xrpl
 ```
 
 ### Configuration
@@ -26,18 +32,18 @@ The service uses [Viper](https://github.com/spf13/viper) for configuration manag
 Set the log level:
 
 ```
-LOG_LEVEL=debug ./chain-xrpl
+LOG_LEVEL=debug make run
 ```
 
 Set the log format:
 
 ```
-LOG_FORMAT=json ./chain-xrpl
+LOG_FORMAT=json make run
 ```
 
 #### YAML Config
 
-Create a `config.yaml` file in the project root (or specify with `--config`). Example:
+Edit `config.yaml` in the project root (or specify with `--config`). Example:
 
 ```yaml
 log:
@@ -52,7 +58,7 @@ server:
 You can specify a custom config file with:
 
 ```
-./chain-xrpl --config /path/to/config.yaml
+docker run -v /path/to/config.yaml:/app/config.yaml -p 8099:8099 chain-xrpl --config /app/config.yaml
 ```
 
 **Precedence:** CLI flag > environment variable > YAML file > default (info).
@@ -61,56 +67,29 @@ You can specify a custom config file with:
 
 ## Development
 
+### Prerequisites
+- [Docker](https://www.docker.com/)
+- [Make](https://www.gnu.org/software/make/)
+
 ### Dependency Installation
 
-Install Go dependencies and vendor them:
-
-```
-go mod tidy
-go mod vendor
-```
-
-Or use the Makefile:
+Install Go dependencies and vendor them (in Docker):
 
 ```
 make deps
 ```
 
-### Code Generation
+### All Code Generation
 
-#### Dependency Injection (Wire)
-
-Generate DI code with Google Wire:
+To update submodules, install dependencies, and generate all code:
 
 ```
-cd internal/di
-wire
-```
-
-Or via Makefile:
-
-```
-make wire
-```
-
-#### Protobuf (buf)
-
-Generate Go code from protobuf definitions:
-
-```
-cd proto
-buf generate
-```
-
-Or via Makefile:
-
-```
-make proto
+make regen
 ```
 
 ### Building and Running
 
-Build the binary:
+Build the Docker image:
 
 ```
 make build
@@ -122,18 +101,43 @@ Run the application:
 make run
 ```
 
-### All-in-One
-
-To generate proto, install dependencies, generate wire, and build:
+Full rebuild (regen + build):
 
 ```
-make all
+make rebuild
 ```
 
-### Protobuf as Submodule
+---
 
-It is recommended to add proto files as a git submodule:
+## Project Structure
+
+- `Dockerfile` — production build (multi-stage, Go + Alpine)
+- `Dockerfile.make` — dev/make environment (buf, wire, protoc-gen-go, etc.)
+- `.dockerignore` — excludes binaries, generated files, VCS, logs, node_modules, etc. from Docker context
+- `Makefile` — all build, run, and codegen commands (see `make help`)
+- `proto/` — protobuf definitions and generated code (standalone Go)
+  - `go.mod` — proto is a Go
+  - `blockchain/*/v1/` — proto and generated files for account, token, types
+- `internal/di` — dependency injection (Google Wire)
+- `config.yaml` — default config
+
+---
+
+## Protobuf as Submodule
+
+You can add proto files as a git submodule if needed:
 
 ```
 git submodule add <repo_with_proto> proto
+```
+
+---
+
+## Notes
+- **prototool** is no longer used for code generation; only **buf** is supported.
+- All commands are run in Docker; local Go toolchain is not required.
+- For available commands, run:
+
+```
+make help
 ```

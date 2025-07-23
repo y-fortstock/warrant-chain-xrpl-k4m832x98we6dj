@@ -1,43 +1,38 @@
 # Makefile для chain-xrpl
 
-.PHONY: all deps wire build help run proto submodule-update
+.PHONY: docker-make deps gen submodule-update regen build run
 
-help:
-	@echo "Доступные команды:"
-	@echo "  make deps   - обновить зависимости и vendor (go mod tidy && go mod vendor)"
-	@echo "  make wire   - сгенерировать wire (cd internal/di && wire)"
-	@echo "  make proto  - сгенерировать Go-код из protobuf через buf (cd ../protobuf && buf generate)"
-	@echo "  make build  - собрать бинарник (go build -o bin/chain-xrpl ./cmd/chain-xrpl)"
-	@echo "  make run    - запустить приложение (go run ./cmd/chain-xrpl)"
-	@echo "  make all    - proto + deps + wire + build"
-	@echo "  make submodule-update - обновить git submodule (git submodule update --init --recursive && git submodule foreach git pull origin main)"
+docker-make:
+	docker build -f Dockerfile.make -t chain-xrpl-make .
 
-all: proto deps wire build
+deps: docker-make
+	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make go mod tidy && go mod vendor
 
-# Обновление зависимостей и vendor
-
-deps:
-	go mod tidy
-	go mod vendor
-
-# Генерация wire (DI)
-
-wire:
-	cd internal/di && wire
-
-# Генерация Go-кода из protobuf через buf
-
-proto:
-	cd ./proto && buf generate
-
-# Сборка бинарника
-
-build: wire proto
-	go build -o bin/chain-xrpl ./cmd/chain-xrpl 
-
-run: wire proto
-	go run ./cmd/chain-xrpl 
+gen:
+	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make sh -c "cd internal/di && wire"
+	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make sh -c "cd ./proto && buf generate"
 
 submodule-update:
 	git submodule update --init --recursive
 	git submodule foreach git pull origin master 
+
+regen: submodule-update deps gen
+
+build:
+	docker build -t chain-xrpl .
+
+rebuild: regen build
+
+run: build
+	docker run -d --rm --name chain-xrpl -p 8099:8099 chain-xrpl
+
+help:
+	@echo "\033[1;33mAvailable commands:\033[0m"
+	@echo "  \033[1;33mdocker-make\033[0m       \033[0;37m- Build Docker image for make environment\033[0m"
+	@echo "  \033[1;33mdeps\033[0m              \033[0;37m- Install Go dependencies and vendor them\033[0m"
+	@echo "  \033[1;33mgen\033[0m               \033[0;37m- Run wire and buf generate\033[0m"
+	@echo "  \033[1;33msubmodule-update\033[0m  \033[0;37m- Update git submodules\033[0m"
+	@echo "  \033[1;33mregen\033[0m             \033[0;37m- Update submodules, deps, and generate code\033[0m"
+	@echo "  \033[1;33mbuild\033[0m             \033[0;37m- Build Docker image for chain-xrpl\033[0m"
+	@echo "  \033[1;33mrebuild\033[0m           \033[0;37m- Full rebuild (regen + build)\033[0m"
+	@echo "  \033[1;33mrun\033[0m               \033[0;37m- Run chain-xrpl container on port 8099\033[0m"

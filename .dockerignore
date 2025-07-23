@@ -1,0 +1,37 @@
+# Binaries and build output
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Generated files
+internal/di/wire_gen.go
+proto/**/*.pb.go
+proto/**/*.pb.gw.go
+proto/**/*.pb.validate.go
+proto/**/*.pb.cc
+proto/**/*.pb.h
+proto/**/*.pb.c
+proto/**/*.pb.m
+proto/**/*.pb.swift
+proto/**/*.pb.rb
+proto/**/*.pb.js
+proto/**/*.pb.ts
+
+# VCS and editor files
+.git/
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Node/npm artifacts (if any)
+proto/node_modules/
+proto/package-lock.json 
