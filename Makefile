@@ -43,4 +43,4 @@ help:
 	@echo "  \033[1;33mrebuild\033[0m           \033[0;37m- Full rebuild (regen + build)\033[0m"
 	@echo "  \033[1;33mrun\033[0m               \033[0;37m- Run chain-xrpl container on port 8099\033[0m"
 	@echo "  \033[1;33mstop\033[0m              \033[0;37m- Stop chain-xrpl container\033[0m"
-	@echo "  \033[1;33mtest\033[0m              \033[0;37m- Run grpcurl tests\033[0m"
+	@echo "  \033[1;33mtest-api\033[0m          \033[0;37m- Run grpcurl tests\033[0m"
