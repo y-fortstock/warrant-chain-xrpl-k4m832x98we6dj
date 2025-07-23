@@ -10,7 +10,7 @@ All development, build, and run operations are performed via Docker and Makefile
 
 Build and run the application in Docker:
 
-```
+```sh
 make run
 ```
 
@@ -19,7 +19,7 @@ This will:
 - Run the container on port 8099
 
 To stop the container:
-```
+```sh
 docker stop chain-xrpl
 ```
 
@@ -31,13 +31,13 @@ The service uses [Viper](https://github.com/spf13/viper) for configuration manag
 
 Set the log level:
 
-```
+```sh
 LOG_LEVEL=debug make run
 ```
 
 Set the log format:
 
-```
+```sh
 LOG_FORMAT=json make run
 ```
 
@@ -57,7 +57,7 @@ server:
 
 You can specify a custom config file with:
 
-```
+```sh
 docker run -v /path/to/config.yaml:/app/config.yaml -p 8099:8099 chain-xrpl --config /app/config.yaml
 ```
 
@@ -75,7 +75,7 @@ docker run -v /path/to/config.yaml:/app/config.yaml -p 8099:8099 chain-xrpl --co
 
 Install Go dependencies and vendor them (in Docker):
 
-```
+```sh
 make deps
 ```
 
@@ -83,7 +83,7 @@ make deps
 
 To update submodules, install dependencies, and generate all code:
 
-```
+```sh
 make regen
 ```
 
@@ -91,19 +91,19 @@ make regen
 
 Build the Docker image:
 
-```
+```sh
 make build
 ```
 
 Run the application:
 
-```
+```sh
 make run
 ```
 
 Full rebuild (regen + build):
 
-```
+```sh
 make rebuild
 ```
 
@@ -127,7 +127,7 @@ make rebuild
 
 You can add proto files as a git submodule if needed:
 
-```
+```sh
 git submodule add <repo_with_proto> proto
 ```
 
@@ -138,6 +138,6 @@ git submodule add <repo_with_proto> proto
 - All commands are run in Docker; local Go toolchain is not required.
 - For available commands, run:
 
-```
+```sh
 make help
 ```
