@@ -3,13 +3,6 @@
 # Modular gRPC API test script for TokenAPI
 # Requires: grpcurl, jq
 # Run from project root. gRPC server must be running at localhost:8099
-
-PROTO_DIR="proto/blockchain"
-TOKEN_PROTO="${PROTO_DIR}/token/v1/token_api.proto"
-TOKEN_PROTO_IMPORT="${PROTO_DIR}/token/v1/token.proto"
-TYPES_ERROR_PROTO="${PROTO_DIR}/types/v1/error.proto"
-TYPES_TRANSACTION_PROTO="${PROTO_DIR}/types/v1/transaction.proto"
-
 IMPORTS=(
   -import-path proto \
   -proto blockchain/token/v1/token_api.proto \
