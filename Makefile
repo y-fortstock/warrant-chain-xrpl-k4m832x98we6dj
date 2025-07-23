@@ -1,6 +1,6 @@
 # Makefile для chain-xrpl
 
-.PHONY: all deps wire build help run proto
+.PHONY: all deps wire build help run proto submodule-update
 
 help:
 	@echo "Доступные команды:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make build  - собрать бинарник (go build -o bin/chain-xrpl ./cmd/chain-xrpl)"
 	@echo "  make run    - запустить приложение (go run ./cmd/chain-xrpl)"
 	@echo "  make all    - proto + deps + wire + build"
+	@echo "  make submodule-update - обновить git submodule (git submodule update --init --recursive && git submodule foreach git pull origin main)"
 
 all: proto deps wire build
 
@@ -36,3 +37,7 @@ build: wire proto
 
 run: wire proto
 	go run ./cmd/chain-xrpl 
+
+submodule-update:
+	git submodule update --init --recursive
+	git submodule foreach git pull origin master 

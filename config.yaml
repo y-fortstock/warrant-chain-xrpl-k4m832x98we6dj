@@ -1,6 +1,7 @@
 log:
-  level: info 
+  # level: debug | info | warn | error
+  level: info
   # format: logfmt | json
   format: logfmt 
 server:
-  listen: ":8099" 
+  listen: ":8099"
