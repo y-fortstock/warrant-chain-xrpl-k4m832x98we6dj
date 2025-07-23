@@ -1,6 +1,6 @@
 # Makefile для chain-xrpl
 
-.PHONY: docker-make deps gen submodule-update regen build run test stop help
+.PHONY: docker-make deps gen submodule-update regen build run test-api stop help
 
 docker-make:
 	docker build -f Dockerfile.make -t chain-xrpl-make .
@@ -26,8 +26,8 @@ rebuild: regen build
 run: build
 	docker run -d --rm --name chain-xrpl -p 8099:8099 chain-xrpl
 
-test:
-	bash .debug/api-tests/test_grpcurl_create_contract.sh
+test-api:
+	bash .debug/api-tests/test_grpc_api.sh
 
 stop:
 	docker stop chain-xrpl

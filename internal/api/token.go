@@ -96,10 +96,22 @@ func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleR
 
 // PauseContract pauses the contract.
 func (t *Token) PauseContract(ctx context.Context, req *tokenv1.PauseContractRequest) (*tokenv1.PauseContractResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PauseContract not implemented")
+	t.logger.Warn("PauseContract is not available for xrpl")
+	return &tokenv1.PauseContractResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method PauseContract not available for xrpl",
+		},
+	}, nil
 }
 
 // ResumeContract resumes the contract.
 func (t *Token) ResumeContract(ctx context.Context, req *tokenv1.ResumeContractRequest) (*tokenv1.ResumeContractResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ResumeContract not implemented")
+	t.logger.Warn("ResumeContract is not available for xrpl")
+	return &tokenv1.ResumeContractResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method ResumeContract not available for xrpl",
+		},
+	}, nil
 }
