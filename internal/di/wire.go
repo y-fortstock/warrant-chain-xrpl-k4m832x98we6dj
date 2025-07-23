@@ -28,8 +28,8 @@ func ProvideAccountAPI() accountv1.AccountAPIServer {
 }
 
 // ProvideTokenAPI returns an implementation of the TokenAPIServer.
-func ProvideTokenAPI() tokenv1.TokenAPIServer {
-	return api.NewToken()
+func ProvideTokenAPI(logger *slog.Logger) tokenv1.TokenAPIServer {
+	return api.NewToken(logger)
 }
 
 // ProvideGRPCServer returns a new gRPC server with registered Account and Token APIs.

@@ -1,6 +1,6 @@
 # Makefile для chain-xrpl
 
-.PHONY: docker-make deps gen submodule-update regen build run
+.PHONY: docker-make deps gen submodule-update regen build run test stop help
 
 docker-make:
 	docker build -f Dockerfile.make -t chain-xrpl-make .
@@ -26,6 +26,12 @@ rebuild: regen build
 run: build
 	docker run -d --rm --name chain-xrpl -p 8099:8099 chain-xrpl
 
+test:
+	bash .debug/api-tests/test_grpcurl_create_contract.sh
+
+stop:
+	docker stop chain-xrpl
+
 help:
 	@echo "\033[1;33mAvailable commands:\033[0m"
 	@echo "  \033[1;33mdocker-make\033[0m       \033[0;37m- Build Docker image for make environment\033[0m"
@@ -36,3 +42,5 @@ help:
 	@echo "  \033[1;33mbuild\033[0m             \033[0;37m- Build Docker image for chain-xrpl\033[0m"
 	@echo "  \033[1;33mrebuild\033[0m           \033[0;37m- Full rebuild (regen + build)\033[0m"
 	@echo "  \033[1;33mrun\033[0m               \033[0;37m- Run chain-xrpl container on port 8099\033[0m"
+	@echo "  \033[1;33mstop\033[0m              \033[0;37m- Stop chain-xrpl container\033[0m"
+	@echo "  \033[1;33mtest\033[0m              \033[0;37m- Run grpcurl tests\033[0m"
