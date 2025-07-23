@@ -34,10 +34,12 @@ func initConfig() {
 	// Bind specific environment variables to config keys
 	viper.BindEnv("log.level", "LOG_LEVEL")
 	viper.BindEnv("log.format", "LOG_FORMAT")
+	viper.BindEnv("server.listen")
 
 	// Set default
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "logfmt")
+	viper.SetDefault("server.listen", ":8099")
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
@@ -57,7 +59,7 @@ var rootCmd = &cobra.Command{
 		server := di.InitializeServer(cfg.LoggerConfig())
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		if err := server.RunWithGracefulShutdown(ctx, ":50051"); err != nil {
+		if err := server.RunWithGracefulShutdown(ctx, cfg.Server.Listen); err != nil {
 			return err
 		}
 

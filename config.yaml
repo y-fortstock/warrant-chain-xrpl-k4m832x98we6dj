@@ -2,3 +2,5 @@ log:
   level: info 
   # format: logfmt | json
   format: logfmt 
+server:
+  listen: ":8099" 

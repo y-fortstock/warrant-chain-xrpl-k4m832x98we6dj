@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/wire"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/api"
+	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/logger"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/server"
 	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
@@ -16,8 +17,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ProvideLogger returns a new slog.Logger instance using the logger package and the provided LoggerConfig.
-func ProvideLogger(cfg logger.LoggerConfig) *slog.Logger {
+// ProvideLogger returns a new slog.Logger instance using the logger package and the provided LogConfig.
+func ProvideLogger(cfg config.LogConfig) *slog.Logger {
 	return logger.NewLogger(cfg)
 }
 
@@ -40,12 +41,12 @@ func ProvideGRPCServer(accountAPI accountv1.AccountAPIServer, tokenAPI tokenv1.T
 }
 
 // ProvideAppServer returns a new application Server using the provided logger and gRPC server.
-func ProvideAppServer(logger *slog.Logger, grpcServer *grpc.Server) *server.Server {
-	return server.NewServerWithGRPC(logger, grpcServer)
+func ProvideAppServer(l *slog.Logger, grpcServer *grpc.Server) *server.Server {
+	return server.NewServerWithGRPC(l, grpcServer)
 }
 
-// InitializeServer creates and initializes a new application server using dependency injection and the provided LoggerConfig.
-func InitializeServer(cfg logger.LoggerConfig) *server.Server {
+// InitializeServer creates and initializes a new application server using dependency injection and the provided LogConfig.
+func InitializeServer(cfg config.LogConfig) *server.Server {
 	wire.Build(
 		ProvideLogger,
 		ProvideAccountAPI,

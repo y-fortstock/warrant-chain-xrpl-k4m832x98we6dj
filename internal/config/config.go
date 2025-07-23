@@ -1,21 +1,24 @@
 package config
 
 import (
-	"log/slog"
-
 	"encoding/json"
 
 	"github.com/spf13/viper"
 	"github.com/ucarion/redact"
-	"gitlab.com/warrant1/warrant/chain-xrpl/internal/logger"
 )
+
+// LogConfig holds configuration for logging. Used by logger implementations.
+type LogConfig struct {
+	Level  string `mapstructure:"level"`
+	Format string `mapstructure:"format"`
+}
 
 // Config содержит параметры конфигурации приложения.
 type Config struct {
-	Log struct {
-		Level  string `mapstructure:"level"`
-		Format string `mapstructure:"format"`
-	} `mapstructure:"log"`
+	Log    LogConfig `mapstructure:"log"`
+	Server struct {
+		Listen string `mapstructure:"listen"`
+	} `mapstructure:"server"`
 }
 
 // LoadConfig загружает конфигурацию из Viper в структуру Config.
@@ -27,39 +30,11 @@ func LoadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-// LogLevel возвращает slog.Level, соответствующий строковому уровню логирования в конфиге.
-func (c *Config) LogLevel() slog.Level {
-	switch c.Log.Level {
-	case "debug":
-		return slog.LevelDebug
-	case "info":
-		return slog.LevelInfo
-	case "warn":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
-}
-
-// LogFormat returns the log format ("logfmt" or "json"). Defaults to "logfmt" if not set or invalid.
-func (c *Config) LogFormat() string {
-	switch c.Log.Format {
-	case "json":
-		return "json"
-	case "logfmt":
-		return "logfmt"
-	default:
-		return "logfmt"
-	}
-}
-
-// LoggerConfig returns a logger.LoggerConfig constructed from the config values.
-func (c *Config) LoggerConfig() logger.LoggerConfig {
-	return logger.LoggerConfig{
-		Level:  c.LogLevel(),
-		Format: c.LogFormat(),
+// LoggerConfig returns a LogConfig constructed from the config values.
+func (c *Config) LoggerConfig() LogConfig {
+	return LogConfig{
+		Level:  c.Log.Level,
+		Format: c.Log.Format,
 	}
 }
 
