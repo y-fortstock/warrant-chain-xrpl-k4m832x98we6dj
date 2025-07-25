@@ -7,6 +7,8 @@ IMPORTS=(
   -import-path proto \
   -proto blockchain/token/v1/token_api.proto \
   -proto blockchain/token/v1/token.proto \
+  -proto blockchain/account/v1/account_api.proto \
+  -proto blockchain/account/v1/account.proto \
   -proto blockchain/types/v1/error.proto \
   -proto blockchain/types/v1/transaction.proto
 )
@@ -68,6 +70,10 @@ run_test() {
 # 1. CreateContract
 CREATE_CONTRACT_REQ='{ "name": "test_contract" }'
 run_test "CreateContract" "blockchain.token.v1.TokenAPI/CreateContract" "$CREATE_CONTRACT_REQ" "" 1
+
+# 1a. AccountAPI Create
+CREATE_ACCOUNT_REQ='{ "password": "deadbeef-1234" }'
+run_test "CreateAccount" "blockchain.account.v1.AccountAPI/Create" "$CREATE_ACCOUNT_REQ" "" 1
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'

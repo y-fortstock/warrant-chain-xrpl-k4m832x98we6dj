@@ -23,13 +23,13 @@ func ProvideLogger(cfg config.LogConfig) *slog.Logger {
 }
 
 // ProvideAccountAPI returns an implementation of the AccountAPIServer.
-func ProvideAccountAPI() accountv1.AccountAPIServer {
-	return api.NewAccount()
+func ProvideAccountAPI(l *slog.Logger) accountv1.AccountAPIServer {
+	return api.NewAccount(l)
 }
 
 // ProvideTokenAPI returns an implementation of the TokenAPIServer.
-func ProvideTokenAPI(logger *slog.Logger) tokenv1.TokenAPIServer {
-	return api.NewToken(logger)
+func ProvideTokenAPI(l *slog.Logger) tokenv1.TokenAPIServer {
+	return api.NewToken(l)
 }
 
 // ProvideGRPCServer returns a new gRPC server with registered Account and Token APIs.
