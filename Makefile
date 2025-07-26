@@ -28,12 +28,15 @@ run: build
 
 test-unit:
 	go test ./... -v
+	go test -bench=. -benchmem ./...
 
 test-api:
 	bash .debug/api-tests/test_grpc_api.sh
 
 stop:
 	docker stop chain-xrpl
+
+rerun: stop run
 
 help:
 	@echo "\033[1;33mAvailable commands:\033[0m"

@@ -36,12 +36,14 @@ func initConfig() {
 	viper.BindEnv("log.format", "LOG_FORMAT")
 	viper.BindEnv("server.listen")
 	viper.BindEnv("network.url")
+	viper.BindEnv("network.timeout")
 
 	// Set default
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "logfmt")
 	viper.SetDefault("server.listen", ":8099")
 	viper.SetDefault("network.url", "https://s.altnet.rippletest.net:51234/")
+	viper.SetDefault("network.timeout", 30)
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())

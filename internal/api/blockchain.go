@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/CreatureDev/xrpl-go/client"
 	jsonrpcclient "github.com/CreatureDev/xrpl-go/client/jsonrpc"
@@ -14,7 +16,9 @@ type Blockchain struct {
 }
 
 func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
-	rpcCfg, err := client.NewJsonRpcConfig(cfg.URL)
+	rpcCfg, err := client.NewJsonRpcConfig(cfg.URL, client.WithHttpClient(&http.Client{
+		Timeout: time.Duration(cfg.Timeout) * time.Second,
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JSON-RPC config for %s: %w", cfg.URL, err)
 	}

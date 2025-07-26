@@ -15,7 +15,8 @@ type LogConfig struct {
 
 // NetworkConfig holds configuration for XRPL network connection.
 type NetworkConfig struct {
-	URL string `mapstructure:"url"`
+	URL     string `mapstructure:"url"`
+	Timeout int64  `mapstructure:"timeout"`
 }
 
 // Config содержит параметры конфигурации приложения.
