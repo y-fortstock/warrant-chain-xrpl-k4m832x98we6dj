@@ -2,12 +2,10 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
-	"github.com/CreatureDev/xrpl-go/model/client/account"
-	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
 )
 
@@ -53,21 +51,15 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 // GetBalance gets the account balance.
 func (a *Account) GetBalance(ctx context.Context, req *accountv1.GetBalanceRequest) (*accountv1.GetBalanceResponse, error) {
 	a.logger.Debug("get balance request", "account", req.AccountId)
-	address := req.AccountId
-	xrplReq := &account.AccountInfoRequest{
-		Account: types.Address(address),
-	}
-	resp, xrplRes, err := a.bc.xrplClient.Account.AccountInfo(xrplReq)
+
+	balance, err := a.bc.GetAccountBalance(req.AccountId)
 	if err != nil {
-		a.logger.Error("failed to get account info ",
-			"error", err,
-			"xrplRes", xrplRes,
-		)
+		a.logger.Error("failed to get account balance", "error", err, "account", req.AccountId)
 		return nil, err
 	}
 
-	a.logger.Debug("account balance response", "account", req.AccountId, "balance", resp.AccountData.Balance)
+	a.logger.Debug("account balance response", "account", req.AccountId, "balance", balance)
 	return &accountv1.GetBalanceResponse{
-		Balance: fmt.Sprintf("%d", resp.AccountData.Balance),
+		Balance: strconv.FormatUint(balance, 10),
 	}, nil
 }
