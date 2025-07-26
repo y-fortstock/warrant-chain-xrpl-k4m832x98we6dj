@@ -33,10 +33,7 @@ func TestGetXRPLAddressFromKeyPair(t *testing.T) {
 				}
 				return
 			}
-			address, err := GetXRPLAddressFromKeyPair(key)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("GetXRPLAddressFromKeyPair() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			address := GetXRPLAddressFromKeyPair(key)
 			if address != tt.expected {
 				t.Errorf("unexpected address: got %s, want %s", address, tt.expected)
 			}
@@ -69,10 +66,7 @@ func TestGetXRPLSecretFromKeyPair(t *testing.T) {
 				}
 				return
 			}
-			secret, err := GetXRPLSecretFromKeyPair(key)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("GetXRPLSecretFromKeyPair() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			secret := GetXRPLSecretFromKeyPair(key)
 			if secret != tt.expected {
 				t.Errorf("unexpected secret: got %s, want %s", secret, tt.expected)
 			}

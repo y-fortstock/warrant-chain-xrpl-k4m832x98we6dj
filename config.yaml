@@ -3,5 +3,8 @@ log:
   level: info
   # format: logfmt | json
   format: logfmt 
+network:
+  # XRPL network URL (testnet, mainnet, or local)
+  url: "https://s.altnet.rippletest.net:51234/"
 server:
   listen: ":8099"

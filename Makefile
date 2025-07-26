@@ -6,7 +6,7 @@ docker-make:
 	docker build -f Dockerfile.make -t chain-xrpl-make .
 
 deps: docker-make
-	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make go mod tidy && go mod vendor
+	docker run --rm -v "$(shell pwd)":/app -w /app -e GOPROXY=https://goproxy.cn,direct -e GOSUMDB=sum.golang.google.cn chain-xrpl-make go mod tidy && go mod vendor
 
 gen:
 	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make sh -c "cd internal/di && wire"
@@ -25,6 +25,9 @@ rebuild: regen build
 
 run: build
 	docker run -d --rm --name chain-xrpl -p 8099:8099 chain-xrpl
+
+test-unit:
+	go test ./... -v
 
 test-api:
 	bash .debug/api-tests/test_grpc_api.sh

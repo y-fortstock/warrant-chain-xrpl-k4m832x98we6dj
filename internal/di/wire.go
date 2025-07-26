@@ -22,9 +22,20 @@ func ProvideLogger(cfg config.LogConfig) *slog.Logger {
 	return logger.NewLogger(cfg)
 }
 
+// ProvideBlockchainOrPanic returns a new Blockchain instance using the provided NetworkConfig.
+// It panics if blockchain creation fails.
+func ProvideBlockchainOrPanic(cfg config.NetworkConfig) *api.Blockchain {
+	bc, err := api.NewBlockchain(cfg)
+	if err != nil {
+		slog.Error("failed to create blockchain", "error", err)
+		panic(err)
+	}
+	return bc
+}
+
 // ProvideAccountAPI returns an implementation of the AccountAPIServer.
-func ProvideAccountAPI(l *slog.Logger) accountv1.AccountAPIServer {
-	return api.NewAccount(l)
+func ProvideAccountAPI(l *slog.Logger, bc *api.Blockchain) accountv1.AccountAPIServer {
+	return api.NewAccount(l, bc)
 }
 
 // ProvideTokenAPI returns an implementation of the TokenAPIServer.
@@ -46,9 +57,10 @@ func ProvideAppServer(l *slog.Logger, grpcServer *grpc.Server) *server.Server {
 }
 
 // InitializeServer creates and initializes a new application server using dependency injection and the provided LogConfig.
-func InitializeServer(cfg config.LogConfig) *server.Server {
+func InitializeServer(cfg config.LogConfig, netCfg config.NetworkConfig) *server.Server {
 	wire.Build(
 		ProvideLogger,
+		ProvideBlockchainOrPanic,
 		ProvideAccountAPI,
 		ProvideTokenAPI,
 		ProvideGRPCServer,

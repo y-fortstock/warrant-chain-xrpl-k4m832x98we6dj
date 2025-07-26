@@ -13,10 +13,16 @@ type LogConfig struct {
 	Format string `mapstructure:"format"`
 }
 
+// NetworkConfig holds configuration for XRPL network connection.
+type NetworkConfig struct {
+	URL string `mapstructure:"url"`
+}
+
 // Config содержит параметры конфигурации приложения.
 type Config struct {
-	Log    LogConfig `mapstructure:"log"`
-	Server struct {
+	Log     LogConfig     `mapstructure:"log"`
+	Network NetworkConfig `mapstructure:"network"`
+	Server  struct {
 		Listen string `mapstructure:"listen"`
 	} `mapstructure:"server"`
 }
@@ -32,10 +38,12 @@ func LoadConfig() (*Config, error) {
 
 // LoggerConfig returns a LogConfig constructed from the config values.
 func (c *Config) LoggerConfig() LogConfig {
-	return LogConfig{
-		Level:  c.Log.Level,
-		Format: c.Log.Format,
-	}
+	return c.Log
+}
+
+// NetworkConfig returns a NetworkConfig constructed from the config values.
+func (c *Config) NetworkConfig() NetworkConfig {
+	return c.Network
 }
 
 // RedactedConfigLog returns a string representation of the config with sensitive fields redacted.

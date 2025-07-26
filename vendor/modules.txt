@@ -1,6 +1,21 @@
 # github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612
 ## explicit; go 1.19
 github.com/CreatureDev/xrpl-go/address-codec
+github.com/CreatureDev/xrpl-go/client
+github.com/CreatureDev/xrpl-go/client/jsonrpc
+github.com/CreatureDev/xrpl-go/client/jsonrpc/models
+github.com/CreatureDev/xrpl-go/model/client/account
+github.com/CreatureDev/xrpl-go/model/client/channel
+github.com/CreatureDev/xrpl-go/model/client/clio
+github.com/CreatureDev/xrpl-go/model/client/common
+github.com/CreatureDev/xrpl-go/model/client/faucet
+github.com/CreatureDev/xrpl-go/model/client/ledger
+github.com/CreatureDev/xrpl-go/model/client/path
+github.com/CreatureDev/xrpl-go/model/client/server
+github.com/CreatureDev/xrpl-go/model/client/subscription
+github.com/CreatureDev/xrpl-go/model/client/transactions
+github.com/CreatureDev/xrpl-go/model/ledger
+github.com/CreatureDev/xrpl-go/model/transactions
 github.com/CreatureDev/xrpl-go/model/transactions/types
 # github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e
 ## explicit
@@ -25,6 +40,15 @@ github.com/google/wire
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
+# github.com/json-iterator/go v1.1.12
+## explicit; go 1.12
+github.com/json-iterator/go
+# github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421
+## explicit
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.2
+## explicit; go 1.12
+github.com/modern-go/reflect2
 # github.com/pelletier/go-toml/v2 v2.2.3
 ## explicit; go 1.21.0
 github.com/pelletier/go-toml/v2
