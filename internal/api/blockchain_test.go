@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/CreatureDev/xrpl-go/keypairs"
+	"github.com/stretchr/testify/assert"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
 )
 
@@ -10,6 +13,19 @@ var (
 	validHexSeed   = "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
 	invalidHexSeed = "invalid_hex_seed"
 )
+
+func TestBlockchain_signer(t *testing.T) {
+	seed := "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu"
+
+	priv, pub, err := keypairs.DeriveKeypair(seed, false)
+	assert.NoError(t, err)
+	fmt.Println("priv: ", priv)
+	fmt.Println("pub: ", pub)
+
+	actual, err := keypairs.Sign([]byte("test"), priv)
+	assert.NoError(t, err)
+	fmt.Println("actual: ", actual)
+}
 
 func TestNewBlockchain(t *testing.T) {
 	tests := []struct {

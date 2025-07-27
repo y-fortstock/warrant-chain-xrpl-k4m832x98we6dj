@@ -41,7 +41,12 @@ run_test() {
     # Compare using jq (normalize JSON)
     if [ $grpc_status -eq 0 ]; then
       if [ -z "$expected_json" ]; then
-        pass=1
+        # For dynamic responses, validate structure
+        if echo "$response" | jq -e '.transaction.id' >/dev/null 2>&1 && \
+           echo "$response" | jq -e '.transaction.blockNumber' >/dev/null 2>&1 && \
+           echo "$response" | jq -e '.transaction.blockTime' >/dev/null 2>&1; then
+          pass=1
+        fi
       else
         diff=$(diff <(echo "$response" | jq -S .) <(echo "$expected_json" | jq -S .))
         if [ -z "$diff" ]; then
@@ -80,6 +85,20 @@ run_test "CreateAccount" "blockchain.account.v1.AccountAPI/Create" "$CREATE_ACCO
 GET_BALANCE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1" }'
 GET_BALANCE_EXPECTED='{ "balance": "10000000" }'
 run_test "GetBalance" "blockchain.account.v1.AccountAPI/GetBalance" "$GET_BALANCE_REQ" "$GET_BALANCE_EXPECTED" 0
+
+# 1c. AccountAPI Deposit
+DEPOSIT_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "1000000" }'
+# Expected response structure (transaction ID and timestamp will be dynamic)
+DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockNumber": "AA==", "blockTime": "[0-9]+" } }'
+run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+
+# 1d. AccountAPI Deposit - Large Amount (should fail if insufficient balance)
+DEPOSIT_LARGE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "999999999999999999" }'
+run_test "DepositLargeAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_LARGE_REQ" "" 0
+
+# 1e. AccountAPI Deposit - Invalid Amount (should fail with parsing error)
+DEPOSIT_INVALID_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "invalid_amount" }'
+run_test "DepositInvalidAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_INVALID_REQ" "" 0
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'

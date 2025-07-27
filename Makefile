@@ -2,11 +2,24 @@
 
 .PHONY: docker-make deps gen submodule-update regen build run test-api stop help
 
+setup:
+	docker network create athens-net || true
+	docker run --rm -d \
+		-e ATHENS_DISK_STORAGE_ROOT=/var/lib/athens \
+		-e ATHENS_STORAGE_TYPE=disk \
+		--network athens-net \
+		-v /Users/undead/SrcCode/data/gomod:/var/lib/athens \
+		-p 3333:3000 \
+		--name athens \
+		gomods/athens:latest
+
 docker-make:
 	docker build -f Dockerfile.make -t chain-xrpl-make .
 
 deps: docker-make
-	docker run --rm -v "$(shell pwd)":/app -w /app -e GOPROXY=https://goproxy.cn,direct -e GOSUMDB=sum.golang.google.cn chain-xrpl-make go mod tidy && go mod vendor
+	docker run --rm --network athens-net -v "$(shell pwd)":/app -w /app -e GOPROXY=http://athens:3000 -e GOSUMDB=off chain-xrpl-make go mod tidy && go mod vendor
+  # docker run --rm -v "$(shell pwd)":/app -w /app -e GOPROXY=https://goproxy.cn,direct -e GOSUMDB=sum.golang.google.cn chain-xrpl-make go mod tidy && go mod vendor
+  # docker run --rm -v "$(shell pwd)":/app -w /app -e GOPROXY=direct -e GOSUMDB=off -e GODEBUG=netdns=go,http2client=0 chain-xrpl-make go mod tidy && go mod vendor
 
 gen:
 	docker run --rm -v "$(shell pwd)":/app -w /app chain-xrpl-make sh -c "cd internal/di && wire"

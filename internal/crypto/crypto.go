@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	ac "github.com/CreatureDev/xrpl-go/address-codec"
-	bip32 "github.com/tyler-smith/go-bip32"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
-func GetKeyPairFromHexSeed(hexSeed string) (*bip32.Key, error) {
+func GetKeyPairFromHexSeed(hexSeed string) (*hdkeychain.ExtendedKey, error) {
 	if hexSeed == "" {
 		return nil, fmt.Errorf("hex seed is empty")
 	}
@@ -19,58 +20,77 @@ func GetKeyPairFromHexSeed(hexSeed string) (*bip32.Key, error) {
 	return GetKeyPairFromSeed(seed)
 }
 
-func GetKeyPairFromSeed(seed []byte) (*bip32.Key, error) {
-	masterKey, err := bip32.NewMasterKey(seed)
+func GetKeyPairFromSeed(seed []byte) (*hdkeychain.ExtendedKey, error) {
+	// Создаем master key с параметрами MainNet
+	masterKey, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create master key: %w", err)
 	}
 
-	purpose, err := masterKey.NewChildKey(bip32.FirstHardenedChild + 44)
+	// m/44' (purpose)
+	purpose, err := masterKey.Derive(hdkeychain.HardenedKeyStart + 44)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create purpose: %w", err)
 	}
 
-	// 144' = hardened 144 (XRP coin type)
-	coinType, err := purpose.NewChildKey(bip32.FirstHardenedChild + 144)
+	// m/44'/144' (XRP coin type)
+	coinType, err := purpose.Derive(hdkeychain.HardenedKeyStart + 144)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create coin type: %w", err)
 	}
 
-	// 0' = hardened 0
-	account, err := coinType.NewChildKey(bip32.FirstHardenedChild + 0)
+	// m/44'/144'/0' (account)
+	account, err := coinType.Derive(hdkeychain.HardenedKeyStart + 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account: %w", err)
 	}
 
-	// 0 = change (external)
-	change, err := account.NewChildKey(0)
+	// m/44'/144'/0'/0 (change - external)
+	change, err := account.Derive(0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create change: %w", err)
 	}
 
-	// 0 = address index
-	addressKey, err := change.NewChildKey(0)
+	// m/44'/144'/0'/0/0 (address index)
+	addressKey, err := change.Derive(0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create address key: %w", err)
 	}
 
-	// return addressKey, nil
 	return addressKey, nil
 }
 
-func GetXRPLAddressFromKeyPair(key *bip32.Key) string {
-	ripemd160 := ac.Sha256RipeMD160(key.PublicKey().Key)
+func GetXRPLAddressFromKeyPair(key *hdkeychain.ExtendedKey) (string, error) {
+	// Получаем публичный ключ
+	pubKey, err := key.ECPubKey()
+	if err != nil {
+		return "", fmt.Errorf("failed to get public key: %w", err)
+	}
+
+	// Сериализуем публичный ключ в сжатом формате
+	pubKeyBytes := pubKey.SerializeCompressed()
+
+	ripemd160 := ac.Sha256RipeMD160(pubKeyBytes)
 	address := ac.Encode(ripemd160,
 		[]byte{ac.AccountAddressPrefix},
 		ac.AccountAddressLength,
 	)
-	return address
+	return address, nil
 }
 
-func GetXRPLSecretFromKeyPair(key *bip32.Key) string {
-	secret := ac.Encode(key.Key,
-		[]byte{ac.ED25519Prefix},
+func GetXRPLSecretFromKeyPair(key *hdkeychain.ExtendedKey) (string, error) {
+	// Получаем приватный ключ
+	privKey, err := key.ECPrivKey()
+	if err != nil {
+		return "", fmt.Errorf("failed to get private key: %w", err)
+	}
+
+	// Сериализуем приватный ключ в байты
+	privKeyBytes := privKey.Serialize()
+
+	secret := ac.Encode(privKeyBytes,
+		[]byte{0x01, 0xe1, 0x4b},
 		32,
 	)
-	return secret
+	return secret, nil
 }

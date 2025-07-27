@@ -37,6 +37,8 @@ func initConfig() {
 	viper.BindEnv("server.listen")
 	viper.BindEnv("network.url")
 	viper.BindEnv("network.timeout")
+	viper.BindEnv("network.system.account", "CHAIN_SYSTEM_ACCOUNT")
+	viper.BindEnv("network.system.secret", "CHAIN_SYSTEM_SECRET")
 
 	// Set default
 	viper.SetDefault("log.level", "info")

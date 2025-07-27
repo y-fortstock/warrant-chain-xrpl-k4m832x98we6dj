@@ -1,9 +1,14 @@
 # github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612
 ## explicit; go 1.19
 github.com/CreatureDev/xrpl-go/address-codec
+github.com/CreatureDev/xrpl-go/binary-codec
+github.com/CreatureDev/xrpl-go/binary-codec/definitions
+github.com/CreatureDev/xrpl-go/binary-codec/serdes
+github.com/CreatureDev/xrpl-go/binary-codec/types
 github.com/CreatureDev/xrpl-go/client
 github.com/CreatureDev/xrpl-go/client/jsonrpc
 github.com/CreatureDev/xrpl-go/client/jsonrpc/models
+github.com/CreatureDev/xrpl-go/keypairs
 github.com/CreatureDev/xrpl-go/model/client/account
 github.com/CreatureDev/xrpl-go/model/client/channel
 github.com/CreatureDev/xrpl-go/model/client/clio
@@ -17,15 +22,29 @@ github.com/CreatureDev/xrpl-go/model/client/transactions
 github.com/CreatureDev/xrpl-go/model/ledger
 github.com/CreatureDev/xrpl-go/model/transactions
 github.com/CreatureDev/xrpl-go/model/transactions/types
-# github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e
-## explicit
-github.com/FactomProject/basen
-# github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec
-## explicit
-github.com/FactomProject/btcutilecc
+github.com/CreatureDev/xrpl-go/pkg/big-decimal
+# github.com/btcsuite/btcd v0.24.2
+## explicit; go 1.17
+github.com/btcsuite/btcd/chaincfg
+github.com/btcsuite/btcd/wire
+# github.com/btcsuite/btcd/btcec/v2 v2.1.3
+## explicit; go 1.17
+github.com/btcsuite/btcd/btcec/v2
+# github.com/btcsuite/btcd/btcutil v1.1.5
+## explicit; go 1.16
+github.com/btcsuite/btcd/btcutil
+github.com/btcsuite/btcd/btcutil/base58
+github.com/btcsuite/btcd/btcutil/bech32
+github.com/btcsuite/btcd/btcutil/hdkeychain
+# github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
+## explicit; go 1.17
+github.com/btcsuite/btcd/chaincfg/chainhash
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
+## explicit; go 1.16
+github.com/decred/dcrd/dcrec/secp256k1/v4
 # github.com/fsnotify/fsnotify v1.8.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
@@ -97,12 +116,12 @@ github.com/stretchr/testify/assert/yaml
 # github.com/subosito/gotenv v1.6.0
 ## explicit; go 1.18
 github.com/subosito/gotenv
-# github.com/tyler-smith/go-bip32 v1.0.0
-## explicit; go 1.14
-github.com/tyler-smith/go-bip32
 # github.com/ucarion/redact v0.0.0-20190527210305-5ee85e474909
 ## explicit; go 1.12
 github.com/ucarion/redact
+# github.com/ugorji/go/codec v1.2.11
+## explicit; go 1.11
+github.com/ugorji/go/codec
 # gitlab.com/warrant1/warrant/protobuf v0.0.0-00010101000000-000000000000 => ./proto
 ## explicit; go 1.24
 gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1
@@ -117,6 +136,7 @@ go.uber.org/multierr
 # golang.org/x/crypto v0.39.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/ripemd160
+golang.org/x/crypto/sha3
 # golang.org/x/net v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/net/http/httpguts
@@ -131,6 +151,7 @@ golang.org/x/net/trace
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.34.0
 ## explicit; go 1.23.0
+golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.27.0

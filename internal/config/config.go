@@ -17,6 +17,10 @@ type LogConfig struct {
 type NetworkConfig struct {
 	URL     string `mapstructure:"url"`
 	Timeout int64  `mapstructure:"timeout"`
+	System  struct {
+		Account string `mapstructure:"account"`
+		Secret  string `mapstructure:"secret"`
+	} `mapstructure:"system"`
 }
 
 // Config содержит параметры конфигурации приложения.
@@ -52,6 +56,7 @@ func (c *Config) NetworkConfig() NetworkConfig {
 func (c *Config) RedactedConfigLog() string {
 	// List of sensitive fields to redact (add as needed, e.g. "api_key", "password")
 	sensitiveFields := [][]string{
+		{"Network", "System", "Secret"},
 		// Example: {"Database", "Password"},
 	}
 	cfgCopy := *c
