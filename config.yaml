@@ -5,8 +5,15 @@ log:
   format: logfmt 
 network:
   # XRPL network URL (testnet, mainnet, or local)
+  # https://xrpl.org/docs/tutorials/public-servers
   url: "https://s.altnet.rippletest.net:51234/"
   # Network timeout in seconds
   timeout: 30
+  # System account configuration
+  system:
+    # System account address
+    account: "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1"
+    # System account secret (will be redacted in logs)
+    secret: "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu"
 server:
   listen: ":8099"
