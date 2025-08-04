@@ -42,6 +42,10 @@ github.com/btcsuite/btcd/chaincfg/chainhash
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/decen-one/go-bip39 v0.0.0-20230726170506-e45ab587d13e
+## explicit; go 1.20
+github.com/decen-one/go-bip39
+github.com/decen-one/go-bip39/wordlist
 # github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
 ## explicit; go 1.16
 github.com/decred/dcrd/dcrec/secp256k1/v4
@@ -135,6 +139,7 @@ go.uber.org/atomic
 go.uber.org/multierr
 # golang.org/x/crypto v0.39.0
 ## explicit; go 1.23.0
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/sha3
 # golang.org/x/net v0.41.0

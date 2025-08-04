@@ -87,25 +87,25 @@ func parseDerivationPath(path string) ([]uint32, error) {
 	return derivationPath, nil
 }
 
-func GetXRPLWallet(key *hdkeychain.ExtendedKey) (address string, private string, err error) {
+func GetXRPLWallet(key *hdkeychain.ExtendedKey) (address string, public string, private string, err error) {
 	secret, err := getXRPLSecret(key)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get secret from key: %w", err)
+		return "", "", "", fmt.Errorf("failed to get secret from key: %w", err)
 	}
 
 	privKey, pubKeyHex, err := keypairs.DeriveKeypair(secret, false)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to derive keypair: %w", err)
+		return "", "", "", fmt.Errorf("failed to derive keypair: %w", err)
 	}
 
 	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to decode public key: %w", err)
+		return "", "", "", fmt.Errorf("failed to decode public key: %w", err)
 	}
 
 	accountID := ac.Sha256RipeMD160(pubKeyBytes)
 	address = ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
-	return address, privKey, nil
+	return address, pubKeyHex, privKey, nil
 }
 
 func getXRPLSecret(key *hdkeychain.ExtendedKey) (string, error) {

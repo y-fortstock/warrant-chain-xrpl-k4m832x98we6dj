@@ -8,6 +8,7 @@ require (
 	github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.5
+	github.com/decen-one/go-bip39 v0.0.0-20230726170506-e45ab587d13e
 	github.com/google/wire v0.6.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1

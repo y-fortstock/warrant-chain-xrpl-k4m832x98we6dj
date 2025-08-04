@@ -12,8 +12,10 @@ network:
   # System account configuration
   system:
     # System account address
-    account: "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1"
+    account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
     # System account secret (will be redacted in logs)
-    secret: "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu"
+    secret: "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
+    # System account public key
+    public: "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
 server:
   listen: ":8099"

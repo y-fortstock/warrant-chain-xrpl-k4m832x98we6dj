@@ -20,6 +20,7 @@ type NetworkConfig struct {
 	System  struct {
 		Account string `mapstructure:"account"`
 		Secret  string `mapstructure:"secret"`
+		Public  string `mapstructure:"public"`
 	} `mapstructure:"system"`
 }
 

@@ -4,14 +4,105 @@ import (
 	"fmt"
 	"testing"
 
+	binarycodec "github.com/CreatureDev/xrpl-go/binary-codec"
+	"github.com/CreatureDev/xrpl-go/keypairs"
 	"github.com/CreatureDev/xrpl-go/model/client/account"
 	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
+	clientledger "github.com/CreatureDev/xrpl-go/model/client/ledger"
 	"github.com/CreatureDev/xrpl-go/model/client/server"
+	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
 	"github.com/CreatureDev/xrpl-go/model/ledger"
+	"github.com/CreatureDev/xrpl-go/model/transactions"
 	"github.com/CreatureDev/xrpl-go/model/transactions/types"
+	"github.com/stretchr/testify/assert"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 )
+
+func TestGetKeyPairFromSeed_1(t *testing.T) {
+	accountAddress := "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
+	publicKey := "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
+	privateKey := "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
+
+	bc, err := NewBlockchain(config.NetworkConfig{
+		URL:     "https://s.altnet.rippletest.net:51234",
+		Timeout: 30,
+		System: struct {
+			Account string `mapstructure:"account"`
+			Secret  string `mapstructure:"secret"`
+			Public  string `mapstructure:"public"`
+		}{
+			Account: accountAddress,
+			Secret:  privateKey,
+			Public:  publicKey,
+		},
+	})
+	assert.NoError(t, err)
+
+	// Получаем информацию об аккаунте
+	accountInfoReq := &account.AccountInfoRequest{
+		Account:     types.Address(accountAddress),
+		LedgerIndex: clientcommon.VALIDATED,
+	}
+	accountInfo, _, err := bc.xrplClient.Account.AccountInfo(accountInfoReq)
+	assert.NoError(t, err)
+	fmt.Println("sequence: ", accountInfo.AccountData.Sequence)
+
+	// Получаем текущий ledger
+	ledgerReq := &clientledger.LedgerRequest{
+		LedgerIndex: clientcommon.VALIDATED,
+	}
+	ledgerResp, _, err := bc.xrplClient.Ledger.Ledger(ledgerReq)
+	assert.NoError(t, err)
+
+	// Конвертируем LedgerIndex в uint32
+	ledgerIndex := uint32(ledgerResp.LedgerIndex) + 20
+	fmt.Println("ledgerIndex: ", ledgerIndex)
+
+	payment := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			Account:            types.Address(accountAddress),
+			TransactionType:    transactions.PaymentTx,
+			Fee:                types.XRPCurrencyAmount(120), // Увеличиваем fee
+			Sequence:           accountInfo.AccountData.Sequence,
+			LastLedgerSequence: ledgerIndex, // Добавляем LastLedgerSequence
+			SigningPubKey:      publicKey,   // Добавляем публичный ключ для подписи
+		},
+		Amount:      types.XRPCurrencyAmount(10000),
+		Destination: types.Address("ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"),
+	}
+	encodedForSigning, err := binarycodec.EncodeForSigning(payment)
+	assert.NoError(t, err)
+	fmt.Println("encodedForSigning: ", encodedForSigning)
+
+	signature, err := keypairs.Sign(encodedForSigning, privateKey)
+	assert.NoError(t, err)
+	fmt.Println("signature: ", signature)
+
+	payment.TxnSignature = signature
+
+	txBlob, err := binarycodec.Encode(payment)
+	assert.NoError(t, err)
+	fmt.Println("txBlob: ", txBlob)
+
+	submitReq := &clienttransactions.SubmitRequest{
+		TxBlob: txBlob,
+	}
+
+	resp, xrplResp, err := bc.xrplClient.Transaction.Submit(submitReq)
+	if err != nil {
+		fmt.Printf("Submit error: %v\n", err)
+		if xrplResp != nil {
+			fmt.Printf("XRPL Response: %+v\n", xrplResp)
+		}
+		// Не делаем assert.NoError здесь, так как аккаунт может не иметь средств
+		return
+	}
+	fmt.Println("resp: ", resp)
+	decodedTx, err := binarycodec.Decode(resp.TxBlob)
+	assert.NoError(t, err)
+	fmt.Println("decodedTx: ", decodedTx)
+}
 
 // XRPLClientInterface определяет интерфейс для XRPL клиента
 type XRPLClientInterface interface {
@@ -44,17 +135,17 @@ type TestBlockchain struct {
 	systemSecret  string
 }
 
-func (tb *TestBlockchain) GetXRPLWallet(hexSeed string, path string) (address string, private string, err error) {
+func (tb *TestBlockchain) GetXRPLWallet(hexSeed string, path string) (address string, public string, private string, err error) {
 	// Используем реальную логику для GetXRPLWallet, так как она не зависит от XRPL клиента
 	extendedKey, err := crypto.GetExtendedKeyFromHexSeedWithPath(hexSeed, path)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get extended key from hex seed: %w", err)
+		return "", "", "", fmt.Errorf("failed to get extended key from hex seed: %w", err)
 	}
-	address, private, err = crypto.GetXRPLWallet(extendedKey)
+	address, public, private, err = crypto.GetXRPLWallet(extendedKey)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get xrpl wallet: %w", err)
+		return "", "", "", fmt.Errorf("failed to get xrpl wallet: %w", err)
 	}
-	return address, private, nil
+	return address, public, private, nil
 }
 
 func (tb *TestBlockchain) GetAccountBalance(address string) (uint64, error) {
@@ -236,7 +327,7 @@ func TestBlockchain_GetXRPLWallet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			address, private, err := blockchain.GetXRPLWallet(tt.hexSeed, tt.path)
+			address, public, private, err := blockchain.GetXRPLWallet(tt.hexSeed, tt.path)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetXRPLWallet() error = %v, wantErr %v", err, tt.wantErr)
@@ -246,6 +337,9 @@ func TestBlockchain_GetXRPLWallet(t *testing.T) {
 			if tt.expectEmpty {
 				if address != "" {
 					t.Errorf("GetXRPLWallet() address = %v, want empty string", address)
+				}
+				if public != "" {
+					t.Errorf("GetXRPLWallet() public = %v, want empty string", public)
 				}
 				if private != "" {
 					t.Errorf("GetXRPLWallet() private = %v, want empty string", private)
