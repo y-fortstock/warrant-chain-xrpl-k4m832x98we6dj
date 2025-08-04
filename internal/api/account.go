@@ -27,7 +27,8 @@ func NewAccount(l *slog.Logger, bc *Blockchain) *Account {
 // Create creates a new ETH account with a password.
 func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*accountv1.CreateResponse, error) {
 	a.logger.Info("create account")
-	address, err := a.bc.GetXRPLAddress(strings.Split(req.Password, "-")[0])
+	seeds := strings.Split(req.Password, "-")
+	address, _, err := a.bc.GetXRPLWallet(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		a.logger.Error("failed to get XRPL address", "error", err)
 		return nil, err

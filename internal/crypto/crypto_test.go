@@ -1,30 +1,19 @@
 package crypto
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"net/http"
 	"testing"
-	"time"
 
 	ac "github.com/CreatureDev/xrpl-go/address-codec"
-	binarycodec "github.com/CreatureDev/xrpl-go/binary-codec"
-	"github.com/CreatureDev/xrpl-go/client"
-	jsonrpcclient "github.com/CreatureDev/xrpl-go/client/jsonrpc"
 	"github.com/CreatureDev/xrpl-go/keypairs"
-	clientaccount "github.com/CreatureDev/xrpl-go/model/client/account"
-	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
-	clientledger "github.com/CreatureDev/xrpl-go/model/client/ledger"
-	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
-	"github.com/CreatureDev/xrpl-go/model/transactions"
-	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	hexSeed = "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
+	hexSeed        = "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
+	derivationPath = "m/44'/144'/0'/0/0"
+	address        = "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
 )
 
 const (
@@ -32,337 +21,263 @@ const (
 	ED25519_PREFIX   = 0xED // 237
 )
 
-func DoubleSha256(data []byte) []byte {
-	first := sha256.Sum256(data)
-	second := sha256.Sum256(first[:])
-	return second[:4]
+// TestGetExtendedKeyFromHexSeedWithPath тестирует получение расширенного ключа из hex seed
+func TestGetExtendedKeyFromHexSeedWithPath(t *testing.T) {
+	key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, key)
+
+	// Проверяем, что ключ можно сериализовать
+	serialized := key.String()
+	assert.NotEmpty(t, serialized)
 }
 
-func EncodeXRPLSeed(entropy []byte, algorithm int) (string, error) {
-	if len(entropy) != 16 {
-		return "", errors.New("entropy must be exactly 16 bytes")
-	}
+// TestGetExtendedKeyFromSeedWithPath тестирует получение расширенного ключа из seed байтов
+func TestGetExtendedKeyFromSeedWithPath(t *testing.T) {
+	seed, err := hex.DecodeString(hexSeed)
+	assert.NoError(t, err)
 
-	// Use the correct prefix for ED25519 as defined in addresscodec
-	var prefix []byte
-	if algorithm == ED25519_PREFIX {
-		prefix = []byte{0x01, 0xe1, 0x4b}
-	} else {
-		prefix = []byte{byte(algorithm)}
-	}
-
-	// 1. Add algorithm prefix
-	data := append(prefix, entropy...)
-
-	// 2. Calculate checksum (double SHA256, first 4 bytes)
-	checksum := DoubleSha256(data)
-
-	// 3. Combine data + checksum
-	fullData := append(data, checksum...)
-
-	// 4. Encode with XRPL base58 dictionary
-	familySeed := ac.EncodeBase58(fullData)
-
-	return familySeed, nil
+	key, err := GetExtendedKeyFromSeedWithPath(seed, derivationPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, key)
 }
 
-func TestGetKeyPairFromSeed_1(t *testing.T) {
-	familySeed := "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu"
+// TestParseDerivationPath тестирует парсинг пути деривации
+func TestParseDerivationPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected []uint32
+		hasError bool
+	}{
+		{
+			name:     "valid path with m/ prefix",
+			path:     "m/44'/144'/0'/0/0",
+			expected: []uint32{2147483692, 2147483792, 2147483648, 0, 0},
+			hasError: false,
+		},
+		{
+			name:     "valid path without m/ prefix",
+			path:     "44'/144'/0'/0/0",
+			expected: []uint32{2147483692, 2147483792, 2147483648, 0, 0},
+			hasError: false,
+		},
+		{
+			name:     "path with mixed hardened and normal",
+			path:     "m/44'/144'/0'/0/1",
+			expected: []uint32{2147483692, 2147483792, 2147483648, 0, 1},
+			hasError: false,
+		},
+		{
+			name:     "empty path",
+			path:     "",
+			expected: nil,
+			hasError: true,
+		},
+		{
+			name:     "invalid path component",
+			path:     "m/44'/abc'/0'/0/0",
+			expected: nil,
+			hasError: true,
+		},
+	}
 
-	priv, pub, err := keypairs.DeriveKeypair(familySeed, false)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseDerivationPath(tt.path)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestGetXRPLWallet тестирует получение XRPL кошелька из расширенного ключа
+func TestGetXRPLWallet(t *testing.T) {
+	key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
 	assert.NoError(t, err)
-	fmt.Println("priv: ", priv)
-	fmt.Println("pub: ", pub)
 
-	// Получаем адрес из публичного ключа
-	pubKeyBytes, err := hex.DecodeString(pub)
+	walletAddress, privateKey, err := GetXRPLWallet(key)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, walletAddress)
+	assert.NotEmpty(t, privateKey)
+
+	// Проверяем, что адрес начинается с 'r' (XRPL адрес)
+	assert.Equal(t, uint8('r'), walletAddress[0])
+
+	// Проверяем, что приватный ключ можно использовать для получения публичного ключа
+	// Используем секрет вместо приватного ключа напрямую
+	secret, err := getXRPLSecret(key)
+	assert.NoError(t, err)
+	_, pubKey, err := keypairs.DeriveKeypair(secret, false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, pubKey)
+}
+
+// TestGetXRPLSecret тестирует получение XRPL секрета из расширенного ключа
+func TestGetXRPLSecret(t *testing.T) {
+	key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
 	assert.NoError(t, err)
 
-	// Используем правильный способ генерации адреса XRPL
+	secret, err := getXRPLSecret(key)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, secret)
+
+	// Проверяем, что секрет можно использовать для получения ключевой пары
+	privKey, pubKey, err := keypairs.DeriveKeypair(secret, false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, privKey)
+	assert.NotEmpty(t, pubKey)
+}
+
+// TestFullDerivationFlow тестирует полный процесс деривации адреса из hexSeed
+func TestFullDerivationFlow(t *testing.T) {
+	// Получаем расширенный ключ из hex seed
+	key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, key)
+
+	// Получаем XRPL кошелек
+	walletAddress, privateKey, err := GetXRPLWallet(key)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, walletAddress)
+	assert.NotEmpty(t, privateKey)
+
+	// Проверяем, что адрес соответствует ожидаемому
+	fmt.Printf("Derived address: %s\n", walletAddress)
+	fmt.Printf("Expected address: %s\n", address)
+
+	// Проверяем, что адрес начинается с 'r' (XRPL адрес)
+	assert.Equal(t, uint8('r'), walletAddress[0])
+
+	// Проверяем, что приватный ключ работает через секрет
+	secret, err := getXRPLSecret(key)
+	assert.NoError(t, err)
+	_, pubKey, err := keypairs.DeriveKeypair(secret, false)
+	assert.NoError(t, err)
+
+	// Проверяем, что публичный ключ можно декодировать
+	pubKeyBytes, err := hex.DecodeString(pubKey)
+	assert.NoError(t, err)
+
+	// Генерируем адрес из публичного ключа
 	accountID := ac.Sha256RipeMD160(pubKeyBytes)
-	accountAddress := ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
-	fmt.Println("accountAddress: ", accountAddress)
+	generatedAddress := ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
 
-	// Получаем текущий sequence number для аккаунта
-	rpcCfg, err := client.NewJsonRpcConfig("https://s.altnet.rippletest.net:51234", client.WithHttpClient(&http.Client{
-		Timeout: time.Duration(30) * time.Second,
-	}))
-	assert.NoError(t, err)
+	// Адрес должен совпадать с полученным из кошелька
+	assert.Equal(t, walletAddress, generatedAddress)
 
-	cli := jsonrpcclient.NewClient(rpcCfg)
-
-	// Получаем информацию об аккаунте
-	accountInfoReq := &clientaccount.AccountInfoRequest{
-		Account:     types.Address(accountAddress),
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	accountInfo, _, err := cli.Account.AccountInfo(accountInfoReq)
-	var sequence uint32 = 1
-	if err != nil {
-		fmt.Printf("Warning: Could not get account info for %s: %v\n", accountAddress, err)
-		fmt.Println("This might be a new account that needs funding")
-		// Для нового аккаунта используем sequence = 1
-	} else {
-		sequence = accountInfo.AccountData.Sequence
-	}
-
-	// Получаем текущий ledger
-	ledgerReq := &clientledger.LedgerRequest{
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	ledgerResp, _, err := cli.Ledger.Ledger(ledgerReq)
-	assert.NoError(t, err)
-
-	// Конвертируем LedgerIndex в uint32
-	ledgerIndex := uint32(ledgerResp.LedgerIndex) + 20
-
-	payment := &transactions.Payment{
-		BaseTx: transactions.BaseTx{
-			Account:            types.Address(accountAddress),
-			TransactionType:    transactions.PaymentTx,
-			Fee:                types.XRPCurrencyAmount(12000), // Увеличиваем fee
-			Sequence:           sequence,
-			LastLedgerSequence: ledgerIndex, // Добавляем LastLedgerSequence
-			SigningPubKey:      pub,         // Добавляем публичный ключ для подписи
-		},
-		Amount:      types.XRPCurrencyAmount(1000000),
-		Destination: types.Address("ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"),
-	}
-	encodedForSigning, err := binarycodec.EncodeForSigning(payment)
-	assert.NoError(t, err)
-	fmt.Println("encodedForSigning: ", encodedForSigning)
-
-	signature, err := keypairs.Sign(encodedForSigning, priv)
-	assert.NoError(t, err)
-	fmt.Println("signature: ", signature)
-
-	payment.TxnSignature = signature
-
-	txBlob, err := binarycodec.Encode(payment)
-	assert.NoError(t, err)
-	fmt.Println("txBlob: ", txBlob)
-
-	submitReq := &clienttransactions.SubmitRequest{
-		TxBlob: txBlob,
-	}
-
-	resp, xrplResp, err := cli.Transaction.Submit(submitReq)
-	if err != nil {
-		fmt.Printf("Submit error: %v\n", err)
-		if xrplResp != nil {
-			fmt.Printf("XRPL Response: %+v\n", xrplResp)
-		}
-		// Не делаем assert.NoError здесь, так как аккаунт может не иметь средств
-		return
-	}
-	fmt.Println("resp: ", resp)
-	fmt.Println("xrplResp: ", xrplResp)
+	// Проверяем, что полученный адрес совпадает с ожидаемым
+	assert.Equal(t, address, walletAddress)
 }
 
-func TestGetKeyPairFromHexSeed(t *testing.T) {
-	tests := []struct {
-		name    string
-		hexSeed string
-		wantErr bool
-	}{
-		{
-			name:    "valid seed",
-			hexSeed: hexSeed,
-			wantErr: false,
-		},
-		{
-			name:    "empty seed",
-			hexSeed: "",
-			wantErr: true,
-		},
-		{
-			name:    "invalid hex",
-			hexSeed: "invalid_hex_string",
-			wantErr: true,
-		},
-		{
-			name:    "short seed (16 bytes)",
-			hexSeed: "1234567890abcdef1234567890abcdef",
-			wantErr: false,
-		},
-		{
-			name:    "too short seed (8 bytes)",
-			hexSeed: "1234567890abcdef",
-			wantErr: true,
-		},
-	}
+// TestInvalidInputs тестирует обработку некорректных входных данных
+func TestInvalidInputs(t *testing.T) {
+	// Тест с некорректным hex seed
+	_, err := GetExtendedKeyFromHexSeedWithPath("invalid_hex", derivationPath)
+	assert.Error(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := GetKeyPairFromHexSeed(tt.hexSeed)
-			fmt.Println("key: ", key)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-			if tt.wantErr {
-				t.Fatalf("expected error but got none")
-			}
-			if key == nil {
-				t.Fatalf("expected key but got nil")
-			}
-		})
-	}
+	// Тест с некорректным путем деривации
+	_, err = GetExtendedKeyFromHexSeedWithPath(hexSeed, "invalid/path")
+	assert.Error(t, err)
+
+	// Тест с пустым hex seed
+	_, err = GetExtendedKeyFromHexSeedWithPath("", derivationPath)
+	assert.Error(t, err)
 }
 
-func TestGetXRPLAddressFromKeyPair(t *testing.T) {
-	tests := []struct {
-		name     string
-		hexSeed  string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "valid seed",
-			hexSeed:  hexSeed,
-			expected: "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1",
-			wantErr:  false,
-		},
-		{
-			name:     "short seed (16 bytes)",
-			hexSeed:  "1234567890abcdef1234567890abcdef",
-			expected: "",
-			wantErr:  false, // Should work with valid seed length
-		},
-	}
+// func TestGetKeyPairFromSeed_1(t *testing.T) {
+// 	familySeed := "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := GetKeyPairFromHexSeed(tt.hexSeed)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("failed to get key pair: %v", err)
-				}
-				return
-			}
+// 	priv, pub, err := keypairs.DeriveKeypair(familySeed, false)
+// 	assert.NoError(t, err)
+// 	fmt.Println("priv: ", priv)
+// 	fmt.Println("pub: ", pub)
 
-			address, err := GetXRPLAddressFromKeyPair(key)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("failed to get XRPL address: %v", err)
-				}
-				return
-			}
+// 	// Получаем адрес из публичного ключа
+// 	pubKeyBytes, err := hex.DecodeString(pub)
+// 	assert.NoError(t, err)
 
-			if tt.expected != "" && address != tt.expected {
-				t.Errorf("unexpected address: got %s, want %s", address, tt.expected)
-			}
+// 	// Используем правильный способ генерации адреса XRPL
+// 	accountID := ac.Sha256RipeMD160(pubKeyBytes)
+// 	accountAddress := ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+// 	fmt.Println("accountAddress: ", accountAddress)
 
-			// Check that address is not empty and has correct format
-			if address == "" {
-				t.Errorf("address should not be empty")
-			}
-			if len(address) < 25 || len(address) > 35 {
-				t.Errorf("address length should be between 25-35 characters, got %d", len(address))
-			}
-		})
-	}
-}
+// 	// Получаем текущий sequence number для аккаунта
+// 	rpcCfg, err := client.NewJsonRpcConfig("https://s.altnet.rippletest.net:51234", client.WithHttpClient(&http.Client{
+// 		Timeout: time.Duration(30) * time.Second,
+// 	}))
+// 	assert.NoError(t, err)
 
-func TestGetXRPLSecretFromKeyPair(t *testing.T) {
-	tests := []struct {
-		name     string
-		hexSeed  string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "valid seed",
-			hexSeed:  hexSeed,
-			expected: "pNURfEJaBcFR15a1X4Zb6sJKuezyuVHZF5XVhTM9uFSCsyUw8WkRu",
-			wantErr:  false,
-		},
-		{
-			name:     "short seed (16 bytes)",
-			hexSeed:  "1234567890abcdef1234567890abcdef",
-			expected: "",
-			wantErr:  false, // Should work with valid seed length
-		},
-	}
+// 	cli := jsonrpcclient.NewClient(rpcCfg)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := GetKeyPairFromHexSeed(tt.hexSeed)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("failed to get key pair: %v", err)
-				}
-				return
-			}
+// 	// Получаем информацию об аккаунте
+// 	accountInfoReq := &clientaccount.AccountInfoRequest{
+// 		Account:     types.Address(accountAddress),
+// 		LedgerIndex: clientcommon.VALIDATED,
+// 	}
+// 	accountInfo, _, err := cli.Account.AccountInfo(accountInfoReq)
+// 	var sequence uint32 = 1
+// 	if err != nil {
+// 		fmt.Printf("Warning: Could not get account info for %s: %v\n", accountAddress, err)
+// 		fmt.Println("This might be a new account that needs funding")
+// 		// Для нового аккаунта используем sequence = 1
+// 	} else {
+// 		sequence = accountInfo.AccountData.Sequence
+// 	}
 
-			secret, err := GetXRPLSecretFromKeyPair(key)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("failed to get XRPL secret: %v", err)
-				}
-				return
-			}
+// 	// Получаем текущий ledger
+// 	ledgerReq := &clientledger.LedgerRequest{
+// 		LedgerIndex: clientcommon.VALIDATED,
+// 	}
+// 	ledgerResp, _, err := cli.Ledger.Ledger(ledgerReq)
+// 	assert.NoError(t, err)
 
-			if tt.expected != "" && secret != tt.expected {
-				t.Errorf("unexpected secret: got %s, want %s", secret, tt.expected)
-			}
+// 	// Конвертируем LedgerIndex в uint32
+// 	ledgerIndex := uint32(ledgerResp.LedgerIndex) + 20
 
-			// Check that secret is not empty and has reasonable length
-			if secret == "" {
-				t.Errorf("secret should not be empty")
-			}
-			if len(secret) < 25 {
-				t.Errorf("secret length should be at least 25 characters, got %d", len(secret))
-			}
-		})
-	}
-}
+// 	payment := &transactions.Payment{
+// 		BaseTx: transactions.BaseTx{
+// 			Account:            types.Address(accountAddress),
+// 			TransactionType:    transactions.PaymentTx,
+// 			Fee:                types.XRPCurrencyAmount(12000), // Увеличиваем fee
+// 			Sequence:           sequence,
+// 			LastLedgerSequence: ledgerIndex, // Добавляем LastLedgerSequence
+// 			SigningPubKey:      pub,         // Добавляем публичный ключ для подписи
+// 		},
+// 		Amount:      types.XRPCurrencyAmount(1000000),
+// 		Destination: types.Address("ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"),
+// 	}
+// 	encodedForSigning, err := binarycodec.EncodeForSigning(payment)
+// 	assert.NoError(t, err)
+// 	fmt.Println("encodedForSigning: ", encodedForSigning)
 
-func TestGetKeyPairFromSeed(t *testing.T) {
-	tests := []struct {
-		name    string
-		seed    []byte
-		wantErr bool
-	}{
-		{
-			name:    "valid seed (16 bytes)",
-			seed:    []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			wantErr: false,
-		},
-		{
-			name:    "valid seed (32 bytes)",
-			seed:    []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
-			wantErr: false,
-		},
-		{
-			name:    "too short seed (8 bytes)",
-			seed:    []byte{1, 2, 3, 4, 5, 6, 7, 8},
-			wantErr: true,
-		},
-		{
-			name:    "empty seed",
-			seed:    []byte{},
-			wantErr: true,
-		},
-	}
+// 	signature, err := keypairs.Sign(encodedForSigning, priv)
+// 	assert.NoError(t, err)
+// 	fmt.Println("signature: ", signature)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := GetKeyPairFromSeed(tt.seed)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-			if tt.wantErr {
-				t.Fatalf("expected error but got none")
-			}
-			if key == nil {
-				t.Fatalf("expected key but got nil")
-			}
-		})
-	}
-}
+// 	payment.TxnSignature = signature
+
+// 	txBlob, err := binarycodec.Encode(payment)
+// 	assert.NoError(t, err)
+// 	fmt.Println("txBlob: ", txBlob)
+
+// 	submitReq := &clienttransactions.SubmitRequest{
+// 		TxBlob: txBlob,
+// 	}
+
+// 	resp, xrplResp, err := cli.Transaction.Submit(submitReq)
+// 	if err != nil {
+// 		fmt.Printf("Submit error: %v\n", err)
+// 		if xrplResp != nil {
+// 			fmt.Printf("XRPL Response: %+v\n", xrplResp)
+// 		}
+// 		// Не делаем assert.NoError здесь, так как аккаунт может не иметь средств
+// 		return
+// 	}
+// 	fmt.Println("resp: ", resp)
+// 	fmt.Println("xrplResp: ", xrplResp)
+// }

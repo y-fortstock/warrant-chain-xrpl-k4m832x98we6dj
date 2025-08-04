@@ -43,20 +43,16 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	return &Blockchain{xrplClient: client, systemAccount: systemAccount, systemSecret: systemSecret}, nil
 }
 
-func (b *Blockchain) GetXRPLAddress(hexSeed string) (string, error) {
-	keyPair, err := crypto.GetKeyPairFromHexSeed(hexSeed)
+func (b *Blockchain) GetXRPLWallet(hexSeed string, path string) (address string, private string, err error) {
+	extendedKey, err := crypto.GetExtendedKeyFromHexSeedWithPath(hexSeed, path)
 	if err != nil {
-		return "", fmt.Errorf("failed to get key pair from hex seed: %w", err)
+		return "", "", fmt.Errorf("failed to get extended key from hex seed: %w", err)
 	}
-	return crypto.GetXRPLAddressFromKeyPair(keyPair)
-}
-
-func (b *Blockchain) GetXRPLSecret(hexSeed string) (string, error) {
-	keyPair, err := crypto.GetKeyPairFromHexSeed(hexSeed)
+	address, private, err = crypto.GetXRPLWallet(extendedKey)
 	if err != nil {
-		return "", fmt.Errorf("failed to get key pair from hex seed: %w", err)
+		return "", "", fmt.Errorf("failed to get xrpl wallet: %w", err)
 	}
-	return crypto.GetXRPLSecretFromKeyPair(keyPair)
+	return address, private, nil
 }
 
 // GetAccountBalance получает баланс аккаунта XRPL

@@ -3,89 +3,117 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 
 	ac "github.com/CreatureDev/xrpl-go/address-codec"
+	"github.com/CreatureDev/xrpl-go/keypairs"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
-func GetKeyPairFromHexSeed(hexSeed string) (*hdkeychain.ExtendedKey, error) {
-	if hexSeed == "" {
-		return nil, fmt.Errorf("hex seed is empty")
-	}
+func GetExtendedKeyFromHexSeedWithPath(hexSeed string, path string) (*hdkeychain.ExtendedKey, error) {
 	seed, err := hex.DecodeString(hexSeed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode hex seed: %w", err)
 	}
-	return GetKeyPairFromSeed(seed)
+	return GetExtendedKeyFromSeedWithPath(seed, path)
 }
 
-func GetKeyPairFromSeed(seed []byte) (*hdkeychain.ExtendedKey, error) {
+func GetExtendedKeyFromSeedWithPath(seed []byte, path string) (*hdkeychain.ExtendedKey, error) {
 	// Создаем master key с параметрами MainNet
 	masterKey, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create master key: %w", err)
 	}
 
-	// m/44' (purpose)
-	purpose, err := masterKey.Derive(hdkeychain.HardenedKeyStart + 44)
+	// Парсим путь BIP-44
+	derivationPath, err := parseDerivationPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create purpose: %w", err)
+		return nil, fmt.Errorf("failed to parse derivation path: %w", err)
 	}
 
-	// m/44'/144' (XRP coin type)
-	coinType, err := purpose.Derive(hdkeychain.HardenedKeyStart + 144)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create coin type: %w", err)
+	// Проходим по всем уровням пути
+	currentKey := masterKey
+	for i, childIndex := range derivationPath {
+		currentKey, err = currentKey.Derive(childIndex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive key at level %d (index %d): %w", i, childIndex, err)
+		}
 	}
 
-	// m/44'/144'/0' (account)
-	account, err := coinType.Derive(hdkeychain.HardenedKeyStart + 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create account: %w", err)
-	}
-
-	// m/44'/144'/0'/0 (change - external)
-	change, err := account.Derive(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create change: %w", err)
-	}
-
-	// m/44'/144'/0'/0/0 (address index)
-	addressKey, err := change.Derive(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create address key: %w", err)
-	}
-
-	return addressKey, nil
+	return currentKey, nil
 }
 
-func GetXRPLAddressFromKeyPair(key *hdkeychain.ExtendedKey) (string, error) {
-	// Получаем публичный ключ
-	pubKey, err := key.ECPubKey()
-	if err != nil {
-		return "", fmt.Errorf("failed to get public key: %w", err)
+// parseDerivationPath парсит строку пути BIP-44 в массив индексов
+func parseDerivationPath(path string) ([]uint32, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is empty")
 	}
 
-	// Сериализуем публичный ключ в сжатом формате
-	pubKeyBytes := pubKey.SerializeCompressed()
+	// Убираем префикс "m/" если он есть
+	if len(path) >= 2 && path[:2] == "m/" {
+		path = path[2:]
+	}
 
-	ripemd160 := ac.Sha256RipeMD160(pubKeyBytes)
-	address := ac.Encode(ripemd160,
-		[]byte{ac.AccountAddressPrefix},
-		ac.AccountAddressLength,
-	)
-	return address, nil
+	// Разбиваем путь по "/"
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid path format")
+	}
+
+	derivationPath := make([]uint32, len(parts))
+	for i, part := range parts {
+		// Проверяем на hardened derivation (с апострофом)
+		hardened := false
+		if strings.HasSuffix(part, "'") {
+			hardened = true
+			part = part[:len(part)-1]
+		}
+
+		// Парсим число
+		index, err := strconv.ParseUint(part, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid path component %s: %w", part, err)
+		}
+
+		if hardened {
+			derivationPath[i] = hdkeychain.HardenedKeyStart + uint32(index)
+		} else {
+			derivationPath[i] = uint32(index)
+		}
+	}
+
+	return derivationPath, nil
 }
 
-func GetXRPLSecretFromKeyPair(key *hdkeychain.ExtendedKey) (string, error) {
-	// Получаем приватный ключ
+func GetXRPLWallet(key *hdkeychain.ExtendedKey) (address string, private string, err error) {
+	secret, err := getXRPLSecret(key)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get secret from key: %w", err)
+	}
+
+	privKey, pubKeyHex, err := keypairs.DeriveKeypair(secret, false)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to derive keypair: %w", err)
+	}
+
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to decode public key: %w", err)
+	}
+
+	accountID := ac.Sha256RipeMD160(pubKeyBytes)
+	address = ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+	return address, privKey, nil
+}
+
+func getXRPLSecret(key *hdkeychain.ExtendedKey) (string, error) {
 	privKey, err := key.ECPrivKey()
 	if err != nil {
 		return "", fmt.Errorf("failed to get private key: %w", err)
 	}
 
-	// Сериализуем приватный ключ в байты
 	privKeyBytes := privKey.Serialize()
 
 	secret := ac.Encode(privKeyBytes,

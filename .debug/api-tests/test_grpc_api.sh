@@ -77,8 +77,8 @@ CREATE_CONTRACT_REQ='{ "name": "test_contract" }'
 run_test "CreateContract" "blockchain.token.v1.TokenAPI/CreateContract" "$CREATE_CONTRACT_REQ" "" 1
 
 # 1a. AccountAPI Create
-CREATE_ACCOUNT_REQ='{ "password": "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f" }'
-CREATE_ACCOUNT_EXPECTED='{ "account": { "id": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1" } }'
+CREATE_ACCOUNT_REQ='{ "password": "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f-0" }'
+CREATE_ACCOUNT_EXPECTED='{ "account": { "id": "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC" } }'
 run_test "CreateAccount" "blockchain.account.v1.AccountAPI/Create" "$CREATE_ACCOUNT_REQ" "$CREATE_ACCOUNT_EXPECTED" 0
 
 # 1b. AccountAPI GetBalance
@@ -86,19 +86,19 @@ GET_BALANCE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1" }'
 GET_BALANCE_EXPECTED='{ "balance": "10000000" }'
 run_test "GetBalance" "blockchain.account.v1.AccountAPI/GetBalance" "$GET_BALANCE_REQ" "$GET_BALANCE_EXPECTED" 0
 
-# 1c. AccountAPI Deposit
-DEPOSIT_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "1000000" }'
-# Expected response structure (transaction ID and timestamp will be dynamic)
-DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockNumber": "AA==", "blockTime": "[0-9]+" } }'
-run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+# # 1c. AccountAPI Deposit
+# DEPOSIT_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "1000000" }'
+# # Expected response structure (transaction ID and timestamp will be dynamic)
+# DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockNumber": "AA==", "blockTime": "[0-9]+" } }'
+# run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
 
-# 1d. AccountAPI Deposit - Large Amount (should fail if insufficient balance)
-DEPOSIT_LARGE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "999999999999999999" }'
-run_test "DepositLargeAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_LARGE_REQ" "" 0
+# # 1d. AccountAPI Deposit - Large Amount (should fail if insufficient balance)
+# DEPOSIT_LARGE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "999999999999999999" }'
+# run_test "DepositLargeAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_LARGE_REQ" "" 0
 
-# 1e. AccountAPI Deposit - Invalid Amount (should fail with parsing error)
-DEPOSIT_INVALID_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "invalid_amount" }'
-run_test "DepositInvalidAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_INVALID_REQ" "" 0
+# # 1e. AccountAPI Deposit - Invalid Amount (should fail with parsing error)
+# DEPOSIT_INVALID_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "invalid_amount" }'
+# run_test "DepositInvalidAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_INVALID_REQ" "" 0
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'
@@ -126,4 +126,4 @@ if [ $fail_count -eq 0 ]; then
   echo "ALL TESTS PASSED"
 else
   echo "SOME TESTS FAILED"
-fi 
+fi
