@@ -76,6 +76,7 @@ message TransferRequest {
   string sender_address_id = 3;
   string sender_pass = 4;
   string signature = 5;
+  optional string receiver_pass = 6;
 }
 
 message TransferResponse {
@@ -89,6 +90,7 @@ message TransferToCreditorRequest {
   string owner_address_pass = 3;
   string creditor_address_id = 4;
   string signature = 5;
+  optional string creditor_pass = 6;
 }
 
 message TransferToCreditorResponse {
@@ -102,6 +104,7 @@ message BuyoutFromCreditorRequest {
   string creditor_address_id = 3;
   string creditor_address_pass = 4;
   string signature = 5;
+  optional string owner_pass = 6;
 }
 
 message BuyoutFromCreditorResponse {

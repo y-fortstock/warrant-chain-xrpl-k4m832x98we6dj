@@ -66,22 +66,46 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 
 // InitiateReplacement initiates a replacement.
 func (t *Token) InitiateReplacement(ctx context.Context, req *tokenv1.InitiateReplacementRequest) (*tokenv1.InitiateReplacementResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method InitiateReplacement not implemented")
+	t.logger.Warn("InitiateReplacement is not available for xrpl")
+	return &tokenv1.InitiateReplacementResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method InitiateReplacement not available for xrpl",
+		},
+	}, nil
 }
 
 // PrepareToReplace prepares to replace.
 func (t *Token) PrepareToReplace(ctx context.Context, req *tokenv1.PrepareToReplaceRequest) (*tokenv1.PrepareToReplaceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PrepareToReplace not implemented")
+	t.logger.Warn("PrepareToReplace is not available for xrpl")
+	return &tokenv1.PrepareToReplaceResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method PrepareToReplace not available for xrpl",
+		},
+	}, nil
 }
 
 // Replace replaces a token.
 func (t *Token) Replace(ctx context.Context, req *tokenv1.ReplaceRequest) (*tokenv1.ReplaceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Replace not implemented")
+	t.logger.Warn("Replace is not available for xrpl")
+	return &tokenv1.ReplaceResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method Replace not available for xrpl",
+		},
+	}, nil
 }
 
 // RevertReplacement reverts a replacement.
 func (t *Token) RevertReplacement(ctx context.Context, req *tokenv1.RevertReplacementRequest) (*tokenv1.RevertReplacementResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RevertReplacement not implemented")
+	t.logger.Warn("RevertReplacement is not available for xrpl")
+	return &tokenv1.RevertReplacementResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method RevertReplacement not available for xrpl",
+		},
+	}, nil
 }
 
 // TransactionInfo returns transaction info.
@@ -91,7 +115,13 @@ func (t *Token) TransactionInfo(ctx context.Context, req *tokenv1.TransactionInf
 
 // AddAddressRole sets an address role.
 func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleRequest) (*tokenv1.AddAddressRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddAddressRole not implemented")
+	t.logger.Warn("AddAddressRole is not available for xrpl")
+	return &tokenv1.AddAddressRoleResponse{
+		Error: &typesv1.Error{
+			Code:        typesv1.Err_ERR_INVALID,
+			Description: "method AddAddressRole not available for xrpl",
+		},
+	}, nil
 }
 
 // PauseContract pauses the contract.
