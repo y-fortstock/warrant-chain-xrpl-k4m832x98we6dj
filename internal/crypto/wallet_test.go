@@ -3,6 +3,7 @@ package crypto
 import (
 	"testing"
 
+	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,12 +42,12 @@ func TestNewWallet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wallet := NewWallet(tt.address, tt.public, tt.private)
+			wallet := NewWallet(types.Address(tt.address), tt.public, tt.private)
 
 			assert.NotNil(t, wallet)
-			assert.Equal(t, tt.address, wallet.Address)
-			assert.Equal(t, tt.public, wallet.Public)
-			assert.Equal(t, tt.private, wallet.Private)
+			assert.Equal(t, types.Address(tt.address), wallet.Address)
+			assert.Equal(t, tt.public, wallet.PublicKey)
+			assert.Equal(t, tt.private, wallet.PrivateKey)
 		})
 	}
 }
@@ -65,15 +66,15 @@ func TestNewWalletFromExtendedKey(t *testing.T) {
 
 		// Verify wallet fields are populated
 		assert.NotEmpty(t, wallet.Address)
-		assert.NotEmpty(t, wallet.Public)
-		assert.NotEmpty(t, wallet.Private)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
 
 		// Verify address format (XRPL addresses start with 'r')
 		assert.Equal(t, uint8('r'), wallet.Address[0])
 
 		// Verify public key is hex string
-		assert.Greater(t, len(wallet.Public), 0)
-		assert.Greater(t, len(wallet.Private), 0)
+		assert.Greater(t, len(wallet.PublicKey), 0)
+		assert.Greater(t, len(wallet.PrivateKey), 0)
 	})
 
 	t.Run("nil extended key", func(t *testing.T) {
@@ -91,14 +92,14 @@ func TestNewWalletFromHexSeed(t *testing.T) {
 
 		// Verify wallet fields are populated
 		assert.NotEmpty(t, wallet.Address)
-		assert.NotEmpty(t, wallet.Public)
-		assert.NotEmpty(t, wallet.Private)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
 
 		// Verify address format
 		assert.Equal(t, uint8('r'), wallet.Address[0])
 
 		// Verify the address matches expected
-		assert.Equal(t, testAddress, wallet.Address)
+		assert.Equal(t, types.Address(testAddress), wallet.Address)
 	})
 
 	t.Run("invalid hex seed", func(t *testing.T) {
@@ -134,15 +135,15 @@ func TestWalletIntegration(t *testing.T) {
 		assert.NotNil(t, wallet)
 
 		// Verify all wallet components
-		assert.Equal(t, testAddress, wallet.Address)
-		assert.NotEmpty(t, wallet.Public)
-		assert.NotEmpty(t, wallet.Private)
+		assert.Equal(t, types.Address(testAddress), wallet.Address)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
 
 		// Verify wallet can be recreated with same data
-		recreatedWallet := NewWallet(wallet.Address, wallet.Public, wallet.Private)
+		recreatedWallet := NewWallet(wallet.Address, wallet.PublicKey, wallet.PrivateKey)
 		assert.Equal(t, wallet.Address, recreatedWallet.Address)
-		assert.Equal(t, wallet.Public, recreatedWallet.Public)
-		assert.Equal(t, wallet.Private, recreatedWallet.Private)
+		assert.Equal(t, wallet.PublicKey, recreatedWallet.PublicKey)
+		assert.Equal(t, wallet.PrivateKey, recreatedWallet.PrivateKey)
 	})
 
 	t.Run("wallet consistency", func(t *testing.T) {
@@ -158,8 +159,8 @@ func TestWalletIntegration(t *testing.T) {
 
 		// Both wallets should be identical
 		assert.Equal(t, wallet1.Address, wallet2.Address)
-		assert.Equal(t, wallet1.Public, wallet2.Public)
-		assert.Equal(t, wallet1.Private, wallet2.Private)
+		assert.Equal(t, wallet1.PublicKey, wallet2.PublicKey)
+		assert.Equal(t, wallet1.PrivateKey, wallet2.PrivateKey)
 	})
 }
 

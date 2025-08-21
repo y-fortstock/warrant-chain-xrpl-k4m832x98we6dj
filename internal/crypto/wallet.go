@@ -3,17 +3,18 @@ package crypto
 import (
 	"fmt"
 
+	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 )
 
 type Wallet struct {
-	Address string
-	Public  string
-	Private string
+	Address    types.Address
+	PublicKey  string
+	PrivateKey string
 }
 
-func NewWallet(address, public, private string) *Wallet {
-	return &Wallet{Address: address, Public: public, Private: private}
+func NewWallet(address types.Address, publicKey, privateKey string) *Wallet {
+	return &Wallet{Address: address, PublicKey: publicKey, PrivateKey: privateKey}
 }
 
 func NewWalletFromExtendedKey(key *hdkeychain.ExtendedKey) (*Wallet, error) {
@@ -24,7 +25,7 @@ func NewWalletFromExtendedKey(key *hdkeychain.ExtendedKey) (*Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewWallet(address, public, private), nil
+	return NewWallet(types.Address(address), public, private), nil
 }
 
 func NewWalletFromHexSeed(hexSeed string, path string) (*Wallet, error) {
