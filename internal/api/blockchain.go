@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -64,7 +63,8 @@ func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	if baseTx == nil {
 		return nil, nil, fmt.Errorf("failed to get base transaction")
 	}
-	baseTx.Fee = types.XRPCurrencyAmount(120)
+	baseTx.Account = w.Address
+	baseTx.SigningPubKey = w.PublicKey
 
 	encodedForSigning, err := binarycodec.EncodeForSigning(tx)
 	if err != nil {
@@ -74,24 +74,12 @@ func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign: %w", err)
 	}
-
-	baseTx.Account = w.Address
-	baseTx.SigningPubKey = w.PublicKey
 	baseTx.TxnSignature = signature
-
-	j, err := json.Marshal(tx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal: %w", err)
-	}
-	fmt.Println()
-	fmt.Println("tx: ", string(j))
 
 	txBlob, err := binarycodec.Encode(tx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode: %w", err)
 	}
-	fmt.Println()
-	fmt.Println("txBlob: ", txBlob)
 
 	submitReq := &clienttransactions.SubmitRequest{
 		TxBlob: txBlob,
