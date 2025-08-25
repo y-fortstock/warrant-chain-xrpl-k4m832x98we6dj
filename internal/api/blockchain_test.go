@@ -1,14 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	binarycodec "github.com/CreatureDev/xrpl-go/binary-codec"
+	"github.com/CreatureDev/xrpl-go/client"
+	jsonrpcclient "github.com/CreatureDev/xrpl-go/client/jsonrpc"
 	"github.com/CreatureDev/xrpl-go/keypairs"
 	"github.com/CreatureDev/xrpl-go/model/client/account"
 	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
-	clientledger "github.com/CreatureDev/xrpl-go/model/client/ledger"
 	"github.com/CreatureDev/xrpl-go/model/client/server"
 	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
 	"github.com/CreatureDev/xrpl-go/model/ledger"
@@ -19,13 +24,195 @@ import (
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 )
 
-func TestGetKeyPairFromSeed_1(t *testing.T) {
-	accountAddress := "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
-	publicKey := "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
-	privateKey := "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
+var (
+	rippleUrl = "https://s.devnet.rippletest.net:51234"
 
-	bc, err := NewBlockchain(config.NetworkConfig{
-		URL:     "https://s.altnet.rippletest.net:51234",
+	accountAddress = "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
+	publicKey      = "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
+	privateKey     = "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
+
+	accountAddress_to = "rJqzDMuSpE8pxztkeES3VeKGauFFRj8qDQ"
+	publicKey_to      = "EDB1B0C29442DB938BAC88A5C5ACEC9349DE619929E045590145126B8E8D6D88AF"
+	privateKey_to     = "ED324167F1057138731EA904BF23D93F29A7BB08D091931ED3FD8FA8182BA7C558"
+)
+
+func TestMPTokenIssuanceCreate(t *testing.T) {
+	rpcCfg, err := client.NewJsonRpcConfig("https://s.devnet.rippletest.net:51234", client.WithHttpClient(&http.Client{
+		Timeout: time.Duration(30) * time.Second,
+	}))
+	assert.NoError(t, err)
+	rpc := jsonrpcclient.NewClient(rpcCfg)
+	assert.NoError(t, err)
+
+	// accountInfoReq := &account.AccountInfoRequest{
+	// 	Account:     types.Address(accountAddress),
+	// 	LedgerIndex: clientcommon.VALIDATED,
+	// }
+	// accountInfo, _, err := rpc.Account.AccountInfo(accountInfoReq)
+	// assert.NoError(t, err)
+	// fmt.Println()
+	// fmt.Println("sequence: ", accountInfo.AccountData.Sequence)
+
+	// ledgerReq := &clientledger.LedgerRequest{
+	// 	LedgerIndex: clientcommon.VALIDATED,
+	// }
+	// ledgerResp, _, err := rpc.Ledger.Ledger(ledgerReq)
+	// assert.NoError(t, err)
+
+	// ledgerIndex := uint32(ledgerResp.LedgerIndex) + 20
+	// fmt.Println()
+	// fmt.Println("ledgerIndex: ", ledgerIndex)
+
+	md := ledger.MPTokenMetadata{
+		Ticker: "WARRANT",
+		Name:   "Test Warrant Token",
+		Desc:   "This is a test token",
+		Icon:   "https://example.com/image.png",
+	}
+	blob, err := md.GetBlob()
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("blob: ", strings.ToUpper(blob))
+
+	mptTokenIssuanceCreate := &transactions.MPTokenIssuanceCreate{
+		BaseTx: transactions.BaseTx{
+			// Account:         types.Address(accountAddress),
+			TransactionType: transactions.MPTokenIssuanceCreateTx,
+			// Fee:             types.XRPCurrencyAmount(120),
+			// Sequence:        accountInfo.AccountData.Sequence,
+			// LastLedgerSequence: ledgerIndex,
+			SigningPubKey: publicKey,
+		},
+		MaximumAmount:   "1",
+		TransferFee:     0,
+		MPTokenMetadata: blob,
+		Flags:           types.NewFlag().SetFlag(types.TfMPTCanEscrow).SetFlag(types.TfMPTCanTrade).SetFlag(types.TfMPTCanTransfer),
+	}
+
+	err = rpc.AutofillTx(types.Address(accountAddress), mptTokenIssuanceCreate)
+	assert.NoError(t, err)
+	mptTokenIssuanceCreate.Fee = types.XRPCurrencyAmount(120)
+
+	j, err := json.Marshal(mptTokenIssuanceCreate)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("tx: ", string(j))
+
+	encodedForSigning, err := binarycodec.EncodeForSigning(mptTokenIssuanceCreate)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("encodedForSigning: ", encodedForSigning)
+
+	signature, err := keypairs.Sign(encodedForSigning, privateKey)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("signature: ", signature)
+
+	mptTokenIssuanceCreate.TxnSignature = signature
+
+	txBlob, err := binarycodec.Encode(mptTokenIssuanceCreate)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("txBlob: ", txBlob)
+
+	submitReq := &clienttransactions.SubmitRequest{
+		TxBlob: txBlob,
+	}
+	j, err = json.Marshal(submitReq)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("json: ", string(j))
+
+	resp, xrplResp, err := rpc.Transaction.Submit(submitReq)
+	if err != nil {
+		fmt.Printf("Submit error: %v\n", err)
+		if xrplResp != nil {
+			fmt.Printf("XRPL Response: %+v\n", xrplResp)
+		}
+		return
+	}
+	fmt.Println()
+	fmt.Println("resp.TxBlob: ", resp.TxBlob)
+	decodedTx, err := binarycodec.Decode(resp.TxBlob)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("decodedTx: ", decodedTx)
+}
+
+func TestPaymentDetailed(t *testing.T) {
+	rpcCfg, err := client.NewJsonRpcConfig("https://s.devnet.rippletest.net:51234", client.WithHttpClient(&http.Client{
+		Timeout: time.Duration(30) * time.Second,
+	}))
+	assert.NoError(t, err)
+	rpc := jsonrpcclient.NewClient(rpcCfg)
+	assert.NoError(t, err)
+
+	payment := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			Account:         types.Address(accountAddress),
+			TransactionType: transactions.PaymentTx,
+			// Fee:             types.XRPCurrencyAmount(120),
+			// Sequence:        accountInfo.AccountData.Sequence,
+			// LastLedgerSequence: ledgerIndex,
+			SigningPubKey: publicKey,
+		},
+		Amount:      types.XRPCurrencyAmount(100000),
+		Destination: types.Address(accountAddress_to),
+	}
+
+	err = rpc.AutofillTx(types.Address(accountAddress), payment)
+	assert.NoError(t, err)
+	payment.Fee = types.XRPCurrencyAmount(120)
+
+	encodedForSigning, err := binarycodec.EncodeForSigning(payment)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("encodedForSigning: ", encodedForSigning)
+
+	signature, err := keypairs.Sign(encodedForSigning, privateKey)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("signature: ", signature)
+
+	payment.TxnSignature = signature
+
+	j, err := json.Marshal(payment)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("tx: ", string(j))
+
+	txBlob, err := binarycodec.Encode(payment)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("txBlob: ", txBlob)
+
+	submitReq := &clienttransactions.SubmitRequest{
+		TxBlob: txBlob,
+	}
+	j, err = json.Marshal(submitReq)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("json: ", string(j))
+
+	resp, xrplResp, err := rpc.Transaction.Submit(submitReq)
+	if err != nil {
+		fmt.Printf("Submit error: %v\n", err)
+		if xrplResp != nil {
+			fmt.Printf("XRPL Response: %+v\n", xrplResp)
+		}
+		return
+	}
+	fmt.Println()
+	fmt.Println("resp.TxBlob: ", resp.TxBlob)
+	decodedTx, err := binarycodec.Decode(resp.TxBlob)
+	assert.NoError(t, err)
+	fmt.Println()
+	fmt.Println("decodedTx: ", decodedTx)
+}
+
+func TestPayment(t *testing.T) {
+	b, err := NewBlockchain(config.NetworkConfig{
+		URL:     rippleUrl,
 		Timeout: 30,
 		System: struct {
 			Account string `mapstructure:"account"`
@@ -33,75 +220,15 @@ func TestGetKeyPairFromSeed_1(t *testing.T) {
 			Public  string `mapstructure:"public"`
 		}{
 			Account: accountAddress,
-			Secret:  privateKey,
 			Public:  publicKey,
+			Secret:  privateKey,
 		},
 	})
 	assert.NoError(t, err)
-
-	// Получаем информацию об аккаунте
-	accountInfoReq := &account.AccountInfoRequest{
-		Account:     types.Address(accountAddress),
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	accountInfo, _, err := bc.xrplClient.Account.AccountInfo(accountInfoReq)
+	h, err := b.PaymentFromSystemAccount(accountAddress_to, 100000)
 	assert.NoError(t, err)
-	fmt.Println("sequence: ", accountInfo.AccountData.Sequence)
-
-	// Получаем текущий ledger
-	ledgerReq := &clientledger.LedgerRequest{
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	ledgerResp, _, err := bc.xrplClient.Ledger.Ledger(ledgerReq)
-	assert.NoError(t, err)
-
-	// Конвертируем LedgerIndex в uint32
-	ledgerIndex := uint32(ledgerResp.LedgerIndex) + 20
-	fmt.Println("ledgerIndex: ", ledgerIndex)
-
-	payment := &transactions.Payment{
-		BaseTx: transactions.BaseTx{
-			Account:            types.Address(accountAddress),
-			TransactionType:    transactions.PaymentTx,
-			Fee:                types.XRPCurrencyAmount(120), // Увеличиваем fee
-			Sequence:           accountInfo.AccountData.Sequence,
-			LastLedgerSequence: ledgerIndex, // Добавляем LastLedgerSequence
-			SigningPubKey:      publicKey,   // Добавляем публичный ключ для подписи
-		},
-		Amount:      types.XRPCurrencyAmount(10000),
-		Destination: types.Address("ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"),
-	}
-	encodedForSigning, err := binarycodec.EncodeForSigning(payment)
-	assert.NoError(t, err)
-	fmt.Println("encodedForSigning: ", encodedForSigning)
-
-	signature, err := keypairs.Sign(encodedForSigning, privateKey)
-	assert.NoError(t, err)
-	fmt.Println("signature: ", signature)
-
-	payment.TxnSignature = signature
-
-	txBlob, err := binarycodec.Encode(payment)
-	assert.NoError(t, err)
-	fmt.Println("txBlob: ", txBlob)
-
-	submitReq := &clienttransactions.SubmitRequest{
-		TxBlob: txBlob,
-	}
-
-	resp, xrplResp, err := bc.xrplClient.Transaction.Submit(submitReq)
-	if err != nil {
-		fmt.Printf("Submit error: %v\n", err)
-		if xrplResp != nil {
-			fmt.Printf("XRPL Response: %+v\n", xrplResp)
-		}
-		// Не делаем assert.NoError здесь, так как аккаунт может не иметь средств
-		return
-	}
-	fmt.Println("resp: ", resp)
-	decodedTx, err := binarycodec.Decode(resp.TxBlob)
-	assert.NoError(t, err)
-	fmt.Println("decodedTx: ", decodedTx)
+	fmt.Println()
+	fmt.Println("h: ", h)
 }
 
 // XRPLClientInterface определяет интерфейс для XRPL клиента

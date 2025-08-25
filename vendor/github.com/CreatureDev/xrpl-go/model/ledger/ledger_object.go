@@ -16,6 +16,8 @@ const (
 	EscrowEntry            LedgerEntryType = "Escrow"
 	FeeSettingsEntry       LedgerEntryType = "FeeSettings"
 	LedgerHashesEntry      LedgerEntryType = "LedgerHashes"
+	MPTokenEntry           LedgerEntryType = "MPToken"
+	MPTokenIssuanceEntry   LedgerEntryType = "MPTokenIssuance"
 	NegativeUNLEntry       LedgerEntryType = "NegativeUNL"
 	NFTokenOfferEntry      LedgerEntryType = "NFTokenOffer"
 	NFTokenPageEntry       LedgerEntryType = "NFTokenPage"
@@ -48,6 +50,10 @@ func GetLedgerEntryTypeOfString(t string) LedgerEntryType {
 		return FeeSettingsEntry
 	case LedgerHashesEntry:
 		return LedgerHashesEntry
+	case MPTokenEntry:
+		return MPTokenEntry
+	case MPTokenIssuanceEntry:
+		return MPTokenIssuanceEntry
 	case NegativeUNLEntry:
 		return NegativeUNLEntry
 	case NFTokenOfferEntry:
@@ -87,6 +93,10 @@ func EmptyLedgerObject(t string) (LedgerObject, error) {
 		return &FeeSettings{}, nil
 	case LedgerHashesEntry:
 		return &LedgerHashes{}, nil
+	case MPTokenEntry:
+		return &MPToken{}, nil
+	case MPTokenIssuanceEntry:
+		return &MPTokenIssuance{}, nil
 	case NegativeUNLEntry:
 		return &NegativeUNL{}, nil
 	case NFTokenOfferEntry:
@@ -136,6 +146,10 @@ func UnmarshalLedgerObject(data []byte) (LedgerObject, error) {
 		o = &FeeSettings{}
 	case LedgerHashesEntry:
 		o = &LedgerHashes{}
+	case MPTokenEntry:
+		o = &MPToken{}
+	case MPTokenIssuanceEntry:
+		o = &MPTokenIssuance{}
 	case NegativeUNLEntry:
 		o = &NegativeUNL{}
 	case NFTokenOfferEntry:

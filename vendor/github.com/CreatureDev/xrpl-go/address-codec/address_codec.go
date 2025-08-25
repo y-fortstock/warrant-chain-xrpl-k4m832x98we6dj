@@ -133,6 +133,23 @@ func DecodeClassicAddressToAccountID(cAddress string) (typePrefix, accountID []b
 
 }
 
+// Returns the classic address from accountID byte slice.
+func EncodeAccountIDToClassicAddress(accountID []byte) (types.Address, error) {
+	if len(accountID) != AccountAddressLength {
+		return "", &EncodeLengthError{Instance: "AccountID", Input: len(accountID), Expected: AccountAddressLength}
+	}
+
+	// Create the payload: [prefix(1 byte) + accountID(20 bytes)]
+	payload := make([]byte, 1+AccountAddressLength)
+	payload[0] = AccountAddressPrefix
+	copy(payload[1:], accountID)
+
+	// Encode with Base58Check
+	classicAddress := Base58CheckEncode(payload)
+
+	return types.Address(classicAddress), nil
+}
+
 func IsValidClassicAddress(cAddress string) bool {
 	_, _, c := DecodeClassicAddressToAccountID(cAddress)
 

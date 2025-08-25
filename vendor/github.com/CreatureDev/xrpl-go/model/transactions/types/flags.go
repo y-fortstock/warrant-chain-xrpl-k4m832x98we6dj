@@ -40,6 +40,52 @@ const (
 	FasfNoFreeze                     = 6
 	FasfRequireAuth                  = 2
 	FasfRequireDest                  = 1
+
+	// MPToken Authorize Flags
+
+	// TfMPTUnauthorize
+	// If set and transaction is submitted by a holder, it indicates that the holder no
+	// longer wants to hold the MPToken, which will be deleted as a result. If the the holder's
+	// MPToken has non-zero balance while trying to set this flag, the transaction will fail. On
+	// the other hand, if set and transaction is submitted by an issuer, it would mean that the
+	// issuer wants to unauthorize the holder (only applicable for allow-listing),
+	// which would unset the lsfMPTAuthorized flag on the MPToken.
+	TfMPTUnauthorize = 0x00000001
+
+	// MPToken IssuanceCreate Flags
+
+	// TfMPTCanLock
+	// If set, indicates that the MPT can be locked both individually and globally.
+	// If not set, the MPT cannot be locked in any way.
+	TfMPTCanLock = 0x00000002
+	// TfMPTRequireAuth
+	// If set, indicates that individual holders must be authorized.
+	// This enables issuers to limit who can hold their assets.
+	TfMPTRequireAuth = 0x00000004
+	// TfMPTCanEscrow
+	// If set, indicates that individual holders can place their balances into an escrow.
+	TfMPTCanEscrow = 0x00000008
+	// TfMPTCanTrade
+	// If set, indicates that individual holders can trade their balances
+	// using the XRP Ledger DEX or AMM.
+	TfMPTCanTrade = 0x00000010
+	// TfMPTCanTransfer
+	// If set, indicates that tokens may be transferred to other accounts
+	// that are not the issuer.
+	TfMPTCanTransfer = 0x00000020
+	// TfMPTCanClawback
+	// If set, indicates that the issuer may use the Clawback transaction
+	// to clawback value from individual holders.
+	TfMPTCanClawback = 0x00000040
+
+	// MPToken IssuanceSet Flags
+
+	// TfMPTLock
+	// If set, indicates that issuer locks the MPT
+	TfMPTLock = 0x00000001
+	// TfMPTUnlock
+	// If set, indicates that issuer unlocks the MPT
+	TfMPTUnlock = 0x00000002
 )
 
 // FlagsI is an interface for types that can be converted to a uint.
