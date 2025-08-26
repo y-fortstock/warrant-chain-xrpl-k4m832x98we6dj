@@ -41,9 +41,13 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	}
 	client := jsonrpcclient.NewClient(rpcCfg)
 
+	systemWallet, err := crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system wallet: %w", err)
+	}
 	return &Blockchain{
 		xrplClient:   client,
-		SystemWallet: crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret),
+		SystemWallet: systemWallet,
 	}, nil
 }
 
@@ -58,6 +62,18 @@ func (b *Blockchain) GetBaseFeeAndReserve() (fee float32, reserve float32, err e
 
 func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	resp *clienttransactions.SubmitResponse, xrplResp client.XRPLResponse, err error) {
+
+	// Проверяем входные параметры
+	if w == nil {
+		return nil, nil, fmt.Errorf("wallet cannot be nil")
+	}
+	if tx == nil {
+		return nil, nil, fmt.Errorf("transaction cannot be nil")
+	}
+	if err := w.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("wallet is invalid: %w", err)
+	}
+
 	if err := b.xrplClient.AutofillTx(w.Address, tx); err != nil {
 		return nil, nil, fmt.Errorf("failed to autofill tx: %w", err)
 	}

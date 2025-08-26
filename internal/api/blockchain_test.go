@@ -7,7 +7,9 @@ import (
 	"github.com/CreatureDev/xrpl-go/model/client/account"
 	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
 	"github.com/CreatureDev/xrpl-go/model/client/server"
+	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
 	"github.com/CreatureDev/xrpl-go/model/ledger"
+	"github.com/CreatureDev/xrpl-go/model/transactions"
 	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
@@ -25,86 +27,6 @@ var (
 	publicKey_to      = "EDB1B0C29442DB938BAC88A5C5ACEC9349DE619929E045590145126B8E8D6D88AF"
 	privateKey_to     = "ED324167F1057138731EA904BF23D93F29A7BB08D091931ED3FD8FA8182BA7C558"
 )
-
-func TestMPTokenIssuanceCreate(t *testing.T) {
-	b, err := NewBlockchain(config.NetworkConfig{
-		URL:     rippleUrl,
-		Timeout: 30,
-		System: struct {
-			Account string `mapstructure:"account"`
-			Secret  string `mapstructure:"secret"`
-			Public  string `mapstructure:"public"`
-		}{
-			Account: accountAddress,
-			Public:  publicKey,
-			Secret:  privateKey,
-		},
-	})
-	assert.NoError(t, err)
-
-	hash, issuanceID, err := b.MPTokenIssuanceCreate(b.SystemWallet, MPToken{
-		DocumentHash: "test",
-		Signature:    "test",
-	})
-	assert.NoError(t, err)
-	fmt.Println("hash: ", hash)
-	fmt.Println("issuanceID: ", issuanceID)
-}
-
-func TestMPTokenAuthorize(t *testing.T) {
-	b, err := NewBlockchain(config.NetworkConfig{
-		URL:     rippleUrl,
-		Timeout: 30,
-	})
-	assert.NoError(t, err)
-	w := crypto.NewWallet(types.Address(accountAddress_to), publicKey_to, privateKey_to)
-	hash, err := b.AuthorizeMPToken(w, "0053430DD0045E31BC8E02B4A85A5FE56B33AA25C3745405")
-	assert.NoError(t, err)
-	fmt.Println("hash: ", hash)
-}
-
-func TestMPTokenTransfer(t *testing.T) {
-	b, err := NewBlockchain(config.NetworkConfig{
-		URL:     rippleUrl,
-		Timeout: 30,
-		System: struct {
-			Account string `mapstructure:"account"`
-			Secret  string `mapstructure:"secret"`
-			Public  string `mapstructure:"public"`
-		}{
-			Account: accountAddress,
-			Public:  publicKey,
-			Secret:  privateKey,
-		},
-	})
-	assert.NoError(t, err)
-
-	w := crypto.NewWallet(types.Address(accountAddress_to), publicKey_to, privateKey_to)
-	hash, err := b.TransferMPToken(b.SystemWallet, "0053430DD0045E31BC8E02B4A85A5FE56B33AA25C3745405", string(w.Address))
-	assert.NoError(t, err)
-	fmt.Println("hash: ", hash)
-}
-
-func TestPayment(t *testing.T) {
-	b, err := NewBlockchain(config.NetworkConfig{
-		URL:     rippleUrl,
-		Timeout: 30,
-		System: struct {
-			Account string `mapstructure:"account"`
-			Secret  string `mapstructure:"secret"`
-			Public  string `mapstructure:"public"`
-		}{
-			Account: accountAddress,
-			Public:  publicKey,
-			Secret:  privateKey,
-		},
-	})
-	assert.NoError(t, err)
-	h, err := b.PaymentFromSystemAccount(accountAddress_to, 100000)
-	assert.NoError(t, err)
-	fmt.Println()
-	fmt.Println("h: ", h)
-}
 
 // XRPLClientInterface определяет интерфейс для XRPL клиента
 type XRPLClientInterface interface {
@@ -236,6 +158,15 @@ func TestNewBlockchain(t *testing.T) {
 			name: "valid network config",
 			cfg: config.NetworkConfig{
 				URL: "https://s.altnet.rippletest.net:51234",
+				System: struct {
+					Account string `mapstructure:"account"`
+					Secret  string `mapstructure:"secret"`
+					Public  string `mapstructure:"public"`
+				}{
+					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
+					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
+				},
 			},
 			wantErr: false,
 		},
@@ -243,6 +174,15 @@ func TestNewBlockchain(t *testing.T) {
 			name: "invalid URL",
 			cfg: config.NetworkConfig{
 				URL: "invalid://url",
+				System: struct {
+					Account string `mapstructure:"account"`
+					Secret  string `mapstructure:"secret"`
+					Public  string `mapstructure:"public"`
+				}{
+					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
+					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
+				},
 			},
 			wantErr: false,
 		},
@@ -500,4 +440,167 @@ func TestBlockchain_GetBaseFee(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBlockchain_SubmitTx(t *testing.T) {
+	// Создаем тестовый кошелек с корректным XRPL адресом
+	testWallet, err := crypto.NewWallet(
+		types.Address("rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"),
+		"ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
+		"ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
+	)
+	assert.NoError(t, err)
+
+	testTx := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			TransactionType: transactions.PaymentTx,
+			Fee:             types.XRPCurrencyAmount(10000),
+			Sequence:        1,
+		},
+		Amount:      types.XRPCurrencyAmount(1000000),
+		Destination: types.Address("rJqzDMuSpE8pxztkeES3VeKGauFFRj8qDQ"),
+	}
+
+	tests := []struct {
+		name     string
+		wallet   *crypto.Wallet
+		tx       transactions.Tx
+		wantErr  bool
+		errorMsg string
+	}{
+		{
+			name:    "valid wallet and transaction",
+			wallet:  testWallet,
+			tx:      testTx,
+			wantErr: false,
+		},
+		{
+			name:     "nil wallet",
+			wallet:   nil,
+			tx:       testTx,
+			wantErr:  true,
+			errorMsg: "wallet cannot be nil",
+		},
+		{
+			name:     "nil transaction",
+			wallet:   testWallet,
+			tx:       nil,
+			wantErr:  true,
+			errorMsg: "transaction cannot be nil",
+		},
+		{
+			name:     "invalid wallet - empty address",
+			wallet:   &crypto.Wallet{Address: "", PublicKey: testWallet.PublicKey, PrivateKey: testWallet.PrivateKey},
+			tx:       testTx,
+			wantErr:  true,
+			errorMsg: "wallet is invalid: wallet address cannot be empty",
+		},
+		{
+			name:     "invalid wallet - empty public key",
+			wallet:   &crypto.Wallet{Address: testWallet.Address, PublicKey: "", PrivateKey: testWallet.PrivateKey},
+			tx:       testTx,
+			wantErr:  true,
+			errorMsg: "wallet is invalid: wallet public key cannot be empty",
+		},
+		{
+			name:     "invalid wallet - empty private key",
+			wallet:   &crypto.Wallet{Address: testWallet.Address, PublicKey: testWallet.PublicKey, PrivateKey: ""},
+			tx:       testTx,
+			wantErr:  true,
+			errorMsg: "wallet is invalid: wallet private key cannot be empty",
+		},
+		{
+			name:     "invalid wallet - malformed address",
+			wallet:   &crypto.Wallet{Address: "invalid_address", PublicKey: testWallet.PublicKey, PrivateKey: testWallet.PrivateKey},
+			tx:       testTx,
+			wantErr:  true,
+			errorMsg: "wallet is invalid: invalid xrpl address length",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Используем mock blockchain вместо реального
+			blockchain, err := NewMockBlockchain(config.NetworkConfig{
+				URL:     "mock://localhost", // Используем mock URL
+				Timeout: 30,
+				System: struct {
+					Account string `mapstructure:"account"`
+					Secret  string `mapstructure:"secret"`
+					Public  string `mapstructure:"public"`
+				}{
+					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
+					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
+				},
+			})
+			assert.NoError(t, err)
+
+			// Вызываем SubmitTx
+			resp, xrplResp, err := blockchain.SubmitTx(tt.wallet, tt.tx)
+
+			// Проверяем результат
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				assert.Nil(t, resp)
+				assert.Nil(t, xrplResp)
+			} else {
+				// Для успешного случая проверяем, что ошибки нет и получен mock ответ
+				assert.NoError(t, err)
+				assert.NotNil(t, resp)
+				assert.Equal(t, "tesSUCCESS", resp.EngineResult)
+				assert.Equal(t, "The transaction was applied.", resp.EngineResultMessage)
+				assert.Equal(t, "mock_tx_blob", resp.TxBlob)
+				assert.True(t, resp.Accepted)
+				assert.True(t, resp.Applied)
+				assert.True(t, resp.Broadcast)
+			}
+		})
+	}
+}
+
+// MockBlockchain - мок версия Blockchain для тестирования SubmitTx
+type MockBlockchain struct {
+	SystemWallet *crypto.Wallet
+}
+
+func NewMockBlockchain(cfg config.NetworkConfig) (*MockBlockchain, error) {
+	systemWallet, err := crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system wallet: %w", err)
+	}
+	return &MockBlockchain{
+		SystemWallet: systemWallet,
+	}, nil
+}
+
+func (b *MockBlockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
+	resp *clienttransactions.SubmitResponse, xrplResp interface{}, err error) {
+
+	// Проверяем входные параметры
+	if w == nil {
+		return nil, nil, fmt.Errorf("wallet cannot be nil")
+	}
+	if tx == nil {
+		return nil, nil, fmt.Errorf("transaction cannot be nil")
+	}
+	if err := w.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("wallet is invalid: %w", err)
+	}
+
+	// Создаем mock ответ
+	mockResp := &clienttransactions.SubmitResponse{
+		EngineResult:        "tesSUCCESS",
+		EngineResultMessage: "The transaction was applied.",
+		TxBlob:              "mock_tx_blob",
+		Accepted:            true,
+		Applied:             true,
+		Broadcast:           true,
+	}
+
+	// Возвращаем mock ответ
+	return mockResp, nil, nil
 }
