@@ -16,18 +16,6 @@ import (
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 )
 
-var (
-	rippleUrl = "https://s.devnet.rippletest.net:51234"
-
-	accountAddress = "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
-	publicKey      = "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
-	privateKey     = "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
-
-	accountAddress_to = "rJqzDMuSpE8pxztkeES3VeKGauFFRj8qDQ"
-	publicKey_to      = "EDB1B0C29442DB938BAC88A5C5ACEC9349DE619929E045590145126B8E8D6D88AF"
-	privateKey_to     = "ED324167F1057138731EA904BF23D93F29A7BB08D091931ED3FD8FA8182BA7C558"
-)
-
 // XRPLClientInterface определяет интерфейс для XRPL клиента
 type XRPLClientInterface interface {
 	Account() AccountInterface
