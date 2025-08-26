@@ -51,13 +51,13 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	}, nil
 }
 
-func (b *Blockchain) GetBaseFeeAndReserve() (fee float32, reserve float32, err error) {
+func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err error) {
 	resp, _, err := b.xrplClient.Server.ServerInfo(&server.ServerInfoRequest{})
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get base fee and reserve: %w", err)
+		return nil, fmt.Errorf("failed to get server info: %w", err)
 	}
 
-	return resp.Info.ValidatedLedger.BaseFeeXRP, resp.Info.ValidatedLedger.ReserveBaseXRP, nil
+	return resp.Info.ValidatedLedger, nil
 }
 
 func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
