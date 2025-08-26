@@ -83,22 +83,21 @@ run_test "CreateAccount" "blockchain.account.v1.AccountAPI/Create" "$CREATE_ACCO
 
 # 1b. AccountAPI GetBalance
 GET_BALANCE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1" }'
-GET_BALANCE_EXPECTED='{ "balance": "10000000" }'
+GET_BALANCE_EXPECTED='{ "balance": "100000000" }'
 run_test "GetBalance" "blockchain.account.v1.AccountAPI/GetBalance" "$GET_BALANCE_REQ" "$GET_BALANCE_EXPECTED" 0
 
-# # 1c. AccountAPI Deposit
-# DEPOSIT_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "1000000" }'
-# # Expected response structure (transaction ID and timestamp will be dynamic)
-# DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockNumber": "AA==", "blockTime": "[0-9]+" } }'
-# run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+# 1c. AccountAPI Deposit
+DEPOSIT_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "weiAmount": "2000000" }'
+# Expected response structure (transaction ID and timestamp will be dynamic)
+DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockTime": "[0-9]+" } }'
+run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "$DEPOSIT_EXPECTED_STRUCTURE" 0
+sleep 5
 
-# # 1d. AccountAPI Deposit - Large Amount (should fail if insufficient balance)
-# DEPOSIT_LARGE_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "999999999999999999" }'
-# run_test "DepositLargeAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_LARGE_REQ" "" 0
-
-# # 1e. AccountAPI Deposit - Invalid Amount (should fail with parsing error)
-# DEPOSIT_INVALID_REQ='{ "accountId": "rUWaveCdPhssfFE3SiFV811w5vvaFxy1W1", "weiAmount": "invalid_amount" }'
-# run_test "DepositInvalidAmount" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_INVALID_REQ" "" 0
+# 1d. AccountAPI ClearBalance
+CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
+# Expected response structure (transaction ID and timestamp will be dynamic)
+CLEAR_BALANCE_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockTime": "[0-9]+" } }'
+run_test "ClearBalance" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "$CLEAR_BALANCE_EXPECTED_STRUCTURE" 0
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'
