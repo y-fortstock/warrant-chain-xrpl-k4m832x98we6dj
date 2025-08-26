@@ -1,5 +1,5 @@
-github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612 h1:rc+jdhJHANYWaYMDGmeLFO7+aub9EzyxFgm+0JvzXK0=
-github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612/go.mod h1:/ApGAaDEMwHnN7kGubFq6cQhKPXMtx31lVFvvSb1L9c=
+github.com/UndeadDemidov/xrpl-go v0.0.0-20250825080922-a4c65a9a890f h1:FQkAyycNs6fPgSLDANDzvtsTmaGqaXxGByL/+o0FKtQ=
+github.com/UndeadDemidov/xrpl-go v0.0.0-20250825080922-a4c65a9a890f/go.mod h1:lQrgUGjBR8gUwxd8VdfjPrGw282DuxZ9HwtZZ8bKEPk=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/btcsuite/btcd v0.20.1-beta/go.mod h1:wVuoA8VJLEcwgqHBwHmzLRazpKxTv13Px/pDuV7OomQ=
 github.com/btcsuite/btcd v0.22.0-beta.0.20220111032746-97732e52810c/go.mod h1:tjmYdS6MLJ5/s0Fj4DbLgSbDHbEqLJrtnHecBFkdz5M=
