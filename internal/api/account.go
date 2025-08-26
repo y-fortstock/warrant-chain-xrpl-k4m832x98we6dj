@@ -29,7 +29,7 @@ func NewAccount(l *slog.Logger, bc *Blockchain) *Account {
 func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*accountv1.CreateResponse, error) {
 	l := a.logger.With("method", "Create")
 	l.Debug("start")
-	seeds := strings.Split(req.Password, "-")
+	seeds := strings.Split(req.GetPassword(), "-")
 	w, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		l.Error("failed to get XRPL address", "error", err)
@@ -46,13 +46,13 @@ func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*ac
 
 // Deposit deposits XRP in drops from system account.
 func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*accountv1.DepositResponse, error) {
-	l := a.logger.With("method", "Deposit", "account", req.AccountId)
-	l.Debug("start", "amount", req.WeiAmount)
+	l := a.logger.With("method", "Deposit", "account", req.GetAccountId())
+	l.Debug("start", "amount", req.GetWeiAmount())
 
-	dropsToTransfer, err := strconv.ParseUint(req.WeiAmount, 10, 64)
+	dropsToTransfer, err := strconv.ParseUint(req.GetWeiAmount(), 10, 64)
 	if err != nil {
-		l.Error("failed to parse amount", "error", err, "amount", req.WeiAmount)
-		return nil, fmt.Errorf("invalid amount: %s", req.WeiAmount)
+		l.Error("failed to parse amount", "error", err, "amount", req.GetWeiAmount())
+		return nil, fmt.Errorf("invalid amount: %s", req.GetWeiAmount())
 	}
 
 	l.Info("payment from system account", "dropsToTransfer", dropsToTransfer)
@@ -60,7 +60,7 @@ func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*
 	if err != nil {
 		l.Error("failed to payment from system account",
 			"error", err,
-			"account", req.AccountId,
+			"account", req.GetAccountId(),
 			"dropsToTransfer", dropsToTransfer)
 		return nil, err
 	}
@@ -76,21 +76,21 @@ func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*
 
 // ClearBalance clears the account balance.
 func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceRequest) (*accountv1.ClearBalanceResponse, error) {
-	l := a.logger.With("method", "ClearBalance", "account", req.AccountId)
+	l := a.logger.With("method", "ClearBalance", "account", req.GetAccountId())
 	l.Debug("start")
 
-	seeds := strings.Split(req.AccountPassword, "-")
+	seeds := strings.Split(req.GetAccountPassword(), "-")
 	w, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		l.Error("failed to get XRPL address", "error", err)
 		return nil, err
 	}
-	if string(w.Address) != req.AccountId {
-		l.Error("account id mismatch", "address", w.Address, "accountId", req.AccountId)
-		return nil, fmt.Errorf("account id mismatch: %s != %s", w.Address, req.AccountId)
+	if string(w.Address) != req.GetAccountId() {
+		l.Error("account id mismatch", "address", w.Address, "accountId", req.GetAccountId())
+		return nil, fmt.Errorf("account id mismatch: %s != %s", w.Address, req.GetAccountId())
 	}
 
-	info, err := a.bc.GetAccountInfo(req.AccountId)
+	info, err := a.bc.GetAccountInfo(req.GetAccountId())
 	if err != nil {
 		l.Error("failed to get account balance", "error", err)
 		return nil, err
@@ -133,10 +133,10 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 
 // GetBalance gets the account balance.
 func (a *Account) GetBalance(ctx context.Context, req *accountv1.GetBalanceRequest) (*accountv1.GetBalanceResponse, error) {
-	l := a.logger.With("method", "GetBalance", "account", req.AccountId)
+	l := a.logger.With("method", "GetBalance", "account", req.GetAccountId())
 	l.Debug("start")
 
-	info, err := a.bc.GetAccountInfo(req.AccountId)
+	info, err := a.bc.GetAccountInfo(req.GetAccountId())
 	if err != nil {
 		l.Error("failed to get account balance", "error", err)
 		return nil, err
