@@ -1,4 +1,4 @@
-# github.com/CreatureDev/xrpl-go v0.0.0-20240415233601-cb7fc925d612
+# github.com/CreatureDev/xrpl-go v0.0.0-20250825080922-a4c65a9a890f => github.com/UndeadDemidov/xrpl-go v0.0.0-20250825080922-a4c65a9a890f
 ## explicit; go 1.19
 github.com/CreatureDev/xrpl-go/address-codec
 github.com/CreatureDev/xrpl-go/binary-codec
@@ -274,4 +274,5 @@ google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/CreatureDev/xrpl-go => github.com/UndeadDemidov/xrpl-go v0.0.0-20250825080922-a4c65a9a890f
 # gitlab.com/warrant1/warrant/protobuf => ./proto

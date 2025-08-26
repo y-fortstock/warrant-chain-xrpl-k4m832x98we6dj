@@ -39,8 +39,8 @@ func ProvideAccountAPI(l *slog.Logger, bc *api.Blockchain) accountv1.AccountAPIS
 }
 
 // ProvideTokenAPI returns an implementation of the TokenAPIServer.
-func ProvideTokenAPI(l *slog.Logger) tokenv1.TokenAPIServer {
-	return api.NewToken(l)
+func ProvideTokenAPI(l *slog.Logger, bc *api.Blockchain) tokenv1.TokenAPIServer {
+	return api.NewToken(l, bc)
 }
 
 // ProvideGRPCServer returns a new gRPC server with registered Account and Token APIs.

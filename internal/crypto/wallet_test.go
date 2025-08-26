@@ -15,39 +15,71 @@ var (
 
 func TestNewWallet(t *testing.T) {
 	tests := []struct {
-		name    string
-		address string
-		public  string
-		private string
+		name          string
+		address       string
+		public        string
+		private       string
+		expectError   bool
+		expectedError string
 	}{
 		{
-			name:    "valid wallet data",
-			address: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
-			public:  "02A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
-			private: "00A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			name:        "valid wallet data",
+			address:     "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+			public:      "02A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			private:     "00A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			expectError: false,
 		},
 		{
-			name:    "empty wallet data",
-			address: "",
-			public:  "",
-			private: "",
+			name:          "empty wallet data",
+			address:       "",
+			public:        "",
+			private:       "",
+			expectError:   true,
+			expectedError: "wallet address cannot be empty",
 		},
 		{
-			name:    "partial wallet data",
-			address: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
-			public:  "",
-			private: "",
+			name:          "partial wallet data - empty address",
+			address:       "",
+			public:        "02A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			private:       "00A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			expectError:   true,
+			expectedError: "wallet address cannot be empty",
+		},
+		{
+			name:          "partial wallet data - empty public key",
+			address:       "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+			public:        "",
+			private:       "00A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			expectError:   true,
+			expectedError: "wallet public key cannot be empty",
+		},
+		{
+			name:          "partial wallet data - empty private key",
+			address:       "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
+			public:        "02A8A44DB3D4C73EEEE11DFE98DEDC90892FD38FC65E71E8D4D7F5F224A8B3323F",
+			private:       "",
+			expectError:   true,
+			expectedError: "wallet private key cannot be empty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wallet := NewWallet(types.Address(tt.address), tt.public, tt.private)
+			wallet, err := NewWallet(types.Address(tt.address), tt.public, tt.private)
 
-			assert.NotNil(t, wallet)
-			assert.Equal(t, types.Address(tt.address), wallet.Address)
-			assert.Equal(t, tt.public, wallet.PublicKey)
-			assert.Equal(t, tt.private, wallet.PrivateKey)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, wallet)
+				if tt.expectedError != "" {
+					assert.Contains(t, err.Error(), tt.expectedError)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, wallet)
+				assert.Equal(t, types.Address(tt.address), wallet.Address)
+				assert.Equal(t, tt.public, wallet.PublicKey)
+				assert.Equal(t, tt.private, wallet.PrivateKey)
+			}
 		})
 	}
 }
@@ -140,7 +172,8 @@ func TestWalletIntegration(t *testing.T) {
 		assert.NotEmpty(t, wallet.PrivateKey)
 
 		// Verify wallet can be recreated with same data
-		recreatedWallet := NewWallet(wallet.Address, wallet.PublicKey, wallet.PrivateKey)
+		recreatedWallet, err := NewWallet(wallet.Address, wallet.PublicKey, wallet.PrivateKey)
+		assert.NoError(t, err)
 		assert.Equal(t, wallet.Address, recreatedWallet.Address)
 		assert.Equal(t, wallet.PublicKey, recreatedWallet.PublicKey)
 		assert.Equal(t, wallet.PrivateKey, recreatedWallet.PrivateKey)
@@ -173,8 +206,14 @@ func TestWalletEdgeCases(t *testing.T) {
 		// This should either succeed or fail gracefully, but not panic
 		if err != nil {
 			assert.Nil(t, wallet)
+			// Log the error for debugging but don't fail the test
+			t.Logf("Expected error for long seed: %v", err)
 		} else {
 			assert.NotNil(t, wallet)
+			// Verify the wallet has valid data
+			assert.NotEmpty(t, wallet.Address)
+			assert.NotEmpty(t, wallet.PublicKey)
+			assert.NotEmpty(t, wallet.PrivateKey)
 		}
 	})
 
@@ -184,8 +223,28 @@ func TestWalletEdgeCases(t *testing.T) {
 		// This should either succeed or fail gracefully, but not panic
 		if err != nil {
 			assert.Nil(t, wallet)
+			// Log the error for debugging but don't fail the test
+			t.Logf("Expected error for complex path: %v", err)
 		} else {
 			assert.NotNil(t, wallet)
+			// Verify the wallet has valid data
+			assert.NotEmpty(t, wallet.Address)
+			assert.NotEmpty(t, wallet.PublicKey)
+			assert.NotEmpty(t, wallet.PrivateKey)
 		}
+	})
+
+	t.Run("malformed hex seed", func(t *testing.T) {
+		malformedSeed := "not_a_hex_string"
+		wallet, err := NewWalletFromHexSeed(malformedSeed, testDerivationPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+
+	t.Run("invalid derivation path format", func(t *testing.T) {
+		invalidPath := "invalid/path/format"
+		wallet, err := NewWalletFromHexSeed(testHexSeed, invalidPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
 	})
 }
