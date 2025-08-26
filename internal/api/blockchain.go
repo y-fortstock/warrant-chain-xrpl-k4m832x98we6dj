@@ -62,8 +62,6 @@ func (b *Blockchain) GetBaseFeeAndReserve() (fee float32, reserve float32, err e
 
 func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	resp *clienttransactions.SubmitResponse, xrplResp client.XRPLResponse, err error) {
-
-	// Проверяем входные параметры
 	if w == nil {
 		return nil, nil, fmt.Errorf("wallet cannot be nil")
 	}
