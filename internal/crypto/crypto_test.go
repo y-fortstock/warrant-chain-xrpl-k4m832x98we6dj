@@ -18,7 +18,9 @@ var (
 )
 
 func TestMnemonic(t *testing.T) {
-	words, err := bip39.NewRandMnemonic("english", 12)
+	ent, err := bip39.NewEntropy(128)
+	assert.NoError(t, err)
+	words, err := bip39.NewMnemonic("english", ent)
 	assert.NoError(t, err)
 	fmt.Println(words)
 
