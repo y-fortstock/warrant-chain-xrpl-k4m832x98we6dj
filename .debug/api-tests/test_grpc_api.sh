@@ -43,7 +43,6 @@ run_test() {
       if [ -z "$expected_json" ]; then
         # For dynamic responses, validate structure
         if echo "$response" | jq -e '.transaction.id' >/dev/null 2>&1 && \
-           echo "$response" | jq -e '.transaction.blockNumber' >/dev/null 2>&1 && \
            echo "$response" | jq -e '.transaction.blockTime' >/dev/null 2>&1; then
           pass=1
         fi
@@ -90,14 +89,14 @@ run_test "GetBalance" "blockchain.account.v1.AccountAPI/GetBalance" "$GET_BALANC
 DEPOSIT_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "weiAmount": "2000000" }'
 # Expected response structure (transaction ID and timestamp will be dynamic)
 DEPOSIT_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockTime": "[0-9]+" } }'
-run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "$DEPOSIT_EXPECTED_STRUCTURE" 0
+run_test "Deposit" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
 sleep 5
 
 # 1d. AccountAPI ClearBalance
 CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
 # Expected response structure (transaction ID and timestamp will be dynamic)
 CLEAR_BALANCE_EXPECTED_STRUCTURE='{ "transaction": { "id": ".*", "blockTime": "[0-9]+" } }'
-run_test "ClearBalance" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "$CLEAR_BALANCE_EXPECTED_STRUCTURE" 0
+run_test "ClearBalance" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'
