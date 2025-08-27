@@ -19,7 +19,6 @@ import (
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/server"
 	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
 	tokenv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1"
-	"google.golang.org/grpc"
 )
 
 // ProvideLogger returns a new slog.Logger instance using the logger package and the provided LogConfig.
@@ -79,22 +78,6 @@ func ProvideTokenAPI(l *slog.Logger, bc *api.Blockchain) tokenv1.TokenAPIServer 
 	return api.NewToken(l, bc)
 }
 
-// ProvideGRPCServer returns a new gRPC server with registered Account and Token APIs.
-// This provider creates and configures the gRPC server, registering all available
-// API services for external communication.
-//
-// Parameters:
-// - accountAPI: The account management API implementation
-// - tokenAPI: The token management API implementation
-//
-// Returns a configured gRPC server with all APIs registered.
-func ProvideGRPCServer(accountAPI accountv1.AccountAPIServer, tokenAPI tokenv1.TokenAPIServer) *grpc.Server {
-	s := grpc.NewServer()
-	accountv1.RegisterAccountAPIServer(s, accountAPI)
-	tokenv1.RegisterTokenAPIServer(s, tokenAPI)
-	return s
-}
-
 // ProvideAppServer returns a new application Server using the provided logger and gRPC server.
 // This provider creates the main application server that manages the gRPC server lifecycle
 // and provides graceful shutdown capabilities.
@@ -104,8 +87,8 @@ func ProvideGRPCServer(accountAPI accountv1.AccountAPIServer, tokenAPI tokenv1.T
 // - grpcServer: The configured gRPC server with registered APIs
 //
 // Returns an application Server instance.
-func ProvideAppServer(l *slog.Logger, grpcServer *grpc.Server) *server.Server {
-	return server.NewServerWithGRPC(l, grpcServer)
+func ProvideAppServer(l *slog.Logger, accountAPI accountv1.AccountAPIServer, tokenAPI tokenv1.TokenAPIServer) *server.Server {
+	return server.NewServerWithAPIs(l, accountAPI, tokenAPI)
 }
 
 // InitializeServer creates and initializes a new application server using dependency injection
@@ -128,7 +111,6 @@ func InitializeServer(cfg config.LogConfig, netCfg config.NetworkConfig) *server
 		ProvideBlockchainOrPanic,
 		ProvideAccountAPI,
 		ProvideTokenAPI,
-		ProvideGRPCServer,
 		ProvideAppServer,
 	)
 	return &server.Server{}

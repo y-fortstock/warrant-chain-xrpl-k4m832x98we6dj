@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
+	tokenv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -56,6 +58,28 @@ func NewServer(logger *slog.Logger) *Server {
 // Returns a new Server instance using the provided gRPC server.
 // This is typically used with dependency injection systems.
 func NewServerWithGRPC(logger *slog.Logger, grpcServer *grpc.Server) *Server {
+	return &Server{
+		grpcServer: grpcServer,
+		logger:     logger,
+	}
+}
+
+// NewServerWithAPIs creates a new Server using the provided API server implementations.
+// This constructor creates a gRPC server internally and registers the provided APIs.
+// This is useful when you want to create a server directly from API implementations
+// without going through the dependency injection system.
+//
+// Parameters:
+// - logger: A configured logger instance for server operations
+// - accountAPI: The account management API implementation
+// - tokenAPI: The token management API implementation
+//
+// Returns a new Server instance with the APIs registered on an internal gRPC server.
+func NewServerWithAPIs(logger *slog.Logger, accountAPI accountv1.AccountAPIServer, tokenAPI tokenv1.TokenAPIServer) *Server {
+	grpcServer := grpc.NewServer()
+	accountv1.RegisterAccountAPIServer(grpcServer, accountAPI)
+	tokenv1.RegisterTokenAPIServer(grpcServer, tokenAPI)
+
 	return &Server{
 		grpcServer: grpcServer,
 		logger:     logger,
