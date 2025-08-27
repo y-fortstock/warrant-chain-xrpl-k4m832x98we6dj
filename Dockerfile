@@ -22,6 +22,7 @@ COPY . .
 RUN cd proto && buf generate
 
 # Generate wire code
+RUN cat -n internal/di/wire.go | head -25
 RUN cd internal/di && wire
 
 # Build the binary using vendor mode
