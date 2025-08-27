@@ -99,16 +99,21 @@ sleep 5
 # # Expected response structure (token ID, transaction ID and timestamp will be dynamic)
 # run_test "Emission" "blockchain.token.v1.TokenAPI/Emission" "$EMISSION_REQ" "" 0
 
+# # TokenAPI TransferToCreditor
+# TRANSFER_TO_CREDITOR_REQ='{ "document_hash": "0056469242ABB74F75D35DB3C9079A7864DCE9527492CFD4", "owner_address_id": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "owner_address_pass": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
+# run_test "TransferToCreditor" "blockchain.token.v1.TokenAPI/TransferToCreditor" "$TRANSFER_TO_CREDITOR_REQ" "" 0
 
+# # TokenAPI TransferFromCreditorToWarehouse
+# TRANSFER_FROM_CREDITOR_TO_WAREHOUSE_REQ='{ "document_hash": "0056469242ABB74F75D35DB3C9079A7864DCE9527492CFD4", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
+# run_test "TransferFromCreditorToWarehouse" "blockchain.token.v1.TokenAPI/TransferFromCreditorToWarehouse" "$TRANSFER_FROM_CREDITOR_TO_WAREHOUSE_REQ" "" 0
 
-# rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2
-# ED3CB3226A54F2E2384F490D8926D09117616A6CBB7AB4DE8FF2FF559256DD4CCB
-# ED9CCE99FD2B6FDBF336606786999364C60B7364E355BA59E789DD06B26C1D0958
-# 202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1
+# 1e. AccountAPI ClearBalance
+CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
+run_test "ClearBalance Warehouse" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
-# # 1e. AccountAPI ClearBalance
-# CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
-# run_test "ClearBalance" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
+# 1e. AccountAPI ClearBalance
+CLEAR_BALANCE_REQ='{ "accountId": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "accountPassword": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1" }'
+run_test "ClearBalance Creditor" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
 # 2. PauseContract
 PAUSE_CONTRACT_REQ='{}'
