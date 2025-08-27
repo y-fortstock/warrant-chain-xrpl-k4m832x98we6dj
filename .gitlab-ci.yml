@@ -1,0 +1,8 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  K3S_MANIFEST: warrant/chain-xrpl.yaml
+
+include:
+  - project: 'warrant1/devops/ci-cd'
+    ref: 'main'
+    file: 'build-docker-deploy-k3s.yml'

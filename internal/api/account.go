@@ -1,3 +1,5 @@
+// Package api provides the gRPC API implementations for the XRPL blockchain service.
+// It includes implementations for account management, token operations, and blockchain interactions.
 package api
 
 import (
@@ -13,19 +15,26 @@ import (
 	typesv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/types/v1"
 )
 
-// Account is an implementation of accountv1.AccountAPIServer.
+// Account implements the accountv1.AccountAPIServer interface.
+// It provides methods for creating, managing, and querying XRPL accounts.
 type Account struct {
 	accountv1.UnimplementedAccountAPIServer
 	bc     *Blockchain
 	logger *slog.Logger
 }
 
-// NewAccount returns a new Account implementation.
+// NewAccount creates and returns a new Account API server instance.
+// It requires a logger and blockchain instance for operation.
 func NewAccount(l *slog.Logger, bc *Blockchain) *Account {
 	return &Account{logger: l, bc: bc}
 }
 
-// Create creates a new ETH account with a password.
+// Create creates a new XRPL account using the provided password.
+// The password should be in the format "hexSeed-derivationIndex" where:
+// - hexSeed is a 64-character hexadecimal string representing the master seed
+// - derivationIndex is the BIP-44 derivation path index
+//
+// Returns the created account information or an error if creation fails.
 func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*accountv1.CreateResponse, error) {
 	l := a.logger.With("method", "Create")
 	l.Debug("start")
@@ -44,7 +53,14 @@ func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*ac
 	}, nil
 }
 
-// Deposit deposits XRP in drops from system account.
+// Deposit transfers XRP from the system account to the specified account.
+// The amount is specified in drops (the smallest unit of XRP, where 1 XRP = 1,000,000 drops).
+//
+// Parameters:
+// - req.AccountId: The destination account address
+// - req.WeiAmount: The amount to deposit in drops (as a string)
+//
+// Returns transaction details including the transaction hash and timestamp.
 func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*accountv1.DepositResponse, error) {
 	l := a.logger.With("method", "Deposit", "account", req.GetAccountId())
 	l.Debug("start", "amount", req.GetWeiAmount())
@@ -74,7 +90,17 @@ func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*
 	}, nil
 }
 
-// ClearBalance clears the account balance.
+// ClearBalance transfers all available XRP from the specified account back to the system account,
+// leaving only the minimum reserve and transaction fee.
+//
+// The account password must match the account ID to authorize the operation.
+// The function calculates the available balance by subtracting the reserve and estimated fee.
+//
+// Parameters:
+// - req.AccountId: The account address to clear
+// - req.AccountPassword: The password in format "hexSeed-derivationIndex"
+//
+// Returns transaction details if successful, or an error if the balance is insufficient.
 func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceRequest) (*accountv1.ClearBalanceResponse, error) {
 	l := a.logger.With("method", "ClearBalance", "account", req.GetAccountId())
 	l.Debug("start")
@@ -131,7 +157,13 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 	}, nil
 }
 
-// GetBalance gets the account balance.
+// GetBalance retrieves the current XRP balance of the specified account.
+// The balance is returned in drops (the smallest unit of XRP).
+//
+// Parameters:
+// - req.AccountId: The account address to query
+//
+// Returns the account balance as a string representation of drops.
 func (a *Account) GetBalance(ctx context.Context, req *accountv1.GetBalanceRequest) (*accountv1.GetBalanceResponse, error) {
 	l := a.logger.With("method", "GetBalance", "account", req.GetAccountId())
 	l.Debug("start")
