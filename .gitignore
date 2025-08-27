@@ -9,7 +9,6 @@ bin/
 
 # сгенерированные файлы
 internal/di/wire_gen.go
-grpc/
 
 # IDE/Editor
 .vscode/
