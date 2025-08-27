@@ -1,143 +1,266 @@
 # chain-xrpl
 
-## Usage
+A Go-based XRPL (XRP Ledger) blockchain service that provides gRPC APIs for account management, token operations, and blockchain interactions.
 
-### Docker-based Workflow
+## Overview
 
-All development, build, and run operations are performed via Docker and Makefile. **You do not need to install Go or any dependencies locally**—just Docker and Make.
+`chain-xrpl` is a microservice that acts as a bridge between applications and the XRPL network. It provides a clean, gRPC-based interface for common blockchain operations including:
 
-### Running the Application
+- **Account Management**: Create accounts, check balances, and manage XRP transfers
+- **Token Operations**: Create and manage Multi-Purpose Tokens (MPTs) for asset-backed warrants
+- **Blockchain Integration**: Direct interaction with XRPL network for transaction submission and querying
 
-Build and run the application in Docker:
+## Architecture
 
-```sh
-make run
+The service is built using modern Go practices and follows a clean architecture pattern:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   gRPC Client  │───▶│   API Layer     │───▶│  XRPL Network   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │  Blockchain     │
+                       │  Interface      │
+                       └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │  Crypto Utils   │
+                       │  & Wallet Mgmt  │
+                       └─────────────────┘
 ```
 
-This will:
-- Build the Docker image for chain-xrpl
-- Run the container on port 8099
+### Core Components
 
-To stop the container:
-```sh
-docker stop chain-xrpl
+- **API Layer**: gRPC service implementations for Account and Token operations
+- **Blockchain Interface**: Abstraction layer for XRPL network interactions
+- **Crypto Utilities**: BIP-44 wallet derivation and XRPL-specific key management
+- **Dependency Injection**: Google Wire for compile-time dependency resolution
+- **Configuration Management**: Viper-based configuration with environment variable support
+
+## Features
+
+### Account Management
+- Create XRPL accounts from seed phrases
+- Deposit XRP from system account to user accounts
+- Clear account balances (return funds to system)
+- Query account balances and information
+
+### Token Operations
+- Create Multi-Purpose Tokens (MPTs) for asset-backed warrants
+- Transfer tokens between accounts
+- Support for creditor-owner token transfers (lending scenarios)
+- Token redemption and warehouse operations
+
+### Blockchain Integration
+- Direct XRPL network connectivity
+- Transaction submission and signing
+- Real-time balance and transaction queries
+- Support for both testnet and mainnet
+
+## Prerequisites
+
+- Go 1.21 or later
+- Access to XRPL network (testnet or mainnet)
+- XRPL account with sufficient XRP for operations
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd chain-xrpl
 ```
 
-### Configuration
-
-The service uses [Viper](https://github.com/spf13/viper) for configuration management. You can configure the log level and format via environment variables, YAML file, or CLI flag.
-
-#### Environment Variables
-
-Set the log level:
-
-```sh
-LOG_LEVEL=debug make run
+2. Install dependencies:
+```bash
+go mod download
 ```
 
-Set the log format:
-
-```sh
-LOG_FORMAT=json make run
+3. Generate Wire dependency injection code:
+```bash
+go generate ./...
 ```
 
-#### YAML Config
+## Configuration
 
-Edit `config.yaml` in the project root (or specify with `--config`). Example:
+The service uses Viper for configuration management. Create a configuration file or set environment variables:
 
+### Configuration File (config.yaml)
 ```yaml
 log:
-  level: info   # or debug, warn, error
-  format: logfmt # or json
+  level: "info"
+  format: "logfmt"
+
+network:
+  url: "https://s.altnet.rippletest.net:51234"
+  timeout: 30
+  system:
+    account: "rYourSystemAccount"
+    secret: "sYourSystemSecret"
+    public: "YourSystemPublicKey"
+
 server:
-  listen: ":8099"
+  listen: ":8080"
 ```
 
-#### CLI Flag
-
-You can specify a custom config file with:
-
-```sh
-docker run -v /path/to/config.yaml:/app/config.yaml -p 8099:8099 chain-xrpl --config /app/config.yaml
+### Environment Variables
+```bash
+export LOG_LEVEL=info
+export LOG_FORMAT=logfmt
+export NETWORK_URL=https://s.altnet.rippletest.net:51234
+export NETWORK_TIMEOUT=30
+export NETWORK_SYSTEM_ACCOUNT=rYourSystemAccount
+export NETWORK_SYSTEM_SECRET=sYourSystemSecret
+export NETWORK_SYSTEM_PUBLIC=YourSystemPublicKey
+export SERVER_LISTEN=:8080
 ```
 
-**Precedence:** CLI flag > environment variable > YAML file > default (info).
+## Usage
 
----
+### Running the Service
+
+1. **Simple Run**:
+```bash
+go run cmd/chain-xrpl/main.go
+```
+
+2. **With Graceful Shutdown**:
+```bash
+go run cmd/chain-xrpl/main.go --graceful
+```
+
+3. **Build and Run**:
+```bash
+go build -o chain-xrpl cmd/chain-xrpl/main.go
+./chain-xrpl
+```
+
+### Docker
+
+```bash
+docker build -t chain-xrpl .
+docker run -p 8080:8080 chain-xrpl
+```
+
+### API Usage
+
+The service exposes gRPC APIs that can be consumed by any gRPC client:
+
+#### Account Operations
+```go
+// Create account
+createReq := &accountv1.CreateRequest{
+    Password: "hexSeed-derivationIndex",
+}
+resp, err := accountClient.Create(ctx, createReq)
+
+// Get balance
+balanceReq := &accountv1.GetBalanceRequest{
+    AccountId: "rAccountAddress",
+}
+balanceResp, err := accountClient.GetBalance(ctx, balanceReq)
+```
+
+#### Token Operations
+```go
+// Create token
+emissionReq := &tokenv1.EmissionRequest{
+    DocumentHash: "documentHash",
+    WarehouseAddressId: "rWarehouseAddress",
+    OwnerAddressId: "rOwnerAddress",
+    Signature: "signature",
+    WarehousePass: "hexSeed-derivationIndex",
+}
+resp, err := tokenClient.Emission(ctx, emissionReq)
+```
 
 ## Development
 
-### Prerequisites
-- [Docker](https://www.docker.com/)
-- [Make](https://www.gnu.org/software/make/)
-
-### Dependency Installation
-
-Install Go dependencies and vendor them (in Docker):
-
-```sh
-make deps
+### Project Structure
+```
+chain-xrpl/
+├── cmd/                    # Application entry points
+├── internal/              # Private application code
+│   ├── api/              # gRPC API implementations
+│   ├── config/           # Configuration management
+│   ├── crypto/           # Cryptographic utilities
+│   ├── di/               # Dependency injection
+│   ├── logger/           # Logging configuration
+│   └── server/           # Server implementation
+├── protobuf/             # Protocol buffer definitions
+├── Dockerfile            # Container configuration
+├── go.mod               # Go module dependencies
+└── README.md            # This file
 ```
 
-### All Code Generation
+### Testing
 
-To update submodules, install dependencies, and generate all code:
-
-```sh
-make regen
+Run the test suite:
+```bash
+go test ./...
 ```
 
-### Building and Running
-
-Build the Docker image:
-
-```sh
-make build
+Run tests with coverage:
+```bash
+go test -cover ./...
 ```
 
-Run the application:
-
-```sh
-make run
+Run specific test packages:
+```bash
+go test ./internal/api/...
+go test ./internal/crypto/...
 ```
 
-Full rebuild (regen + build):
+### Code Generation
 
-```sh
-make rebuild
+The project uses several code generation tools:
+
+1. **Wire** (Dependency Injection):
+```bash
+go generate ./internal/di/...
 ```
 
----
-
-## Project Structure
-
-- `Dockerfile` — production build (multi-stage, Go + Alpine)
-- `Dockerfile.make` — dev/make environment (buf, wire, protoc-gen-go, etc.)
-- `.dockerignore` — excludes binaries, generated files, VCS, logs, node_modules, etc. from Docker context
-- `Makefile` — all build, run, and codegen commands (see `make help`)
-- `proto/` — protobuf definitions and generated code (standalone Go)
-  - `go.mod` — proto is a Go
-  - `blockchain/*/v1/` — proto and generated files for account, token, types
-- `internal/di` — dependency injection (Google Wire)
-- `config.yaml` — default config
-
----
-
-## Protobuf as Submodule
-
-You can add proto files as a git submodule if needed:
-
-```sh
-git submodule add <repo_with_proto> proto
+2. **Protocol Buffers**:
+```bash
+protoc --go_out=. --go-grpc_out=. protobuf/**/*.proto
 ```
 
----
+## Security Considerations
 
-## Notes
-- **prototool** is no longer used for code generation; only **buf** is supported.
-- All commands are run in Docker; local Go toolchain is not required.
-- For available commands, run:
+- **Private Keys**: Never log or expose private keys or secrets
+- **Network Security**: Use HTTPS for production deployments
+- **Access Control**: Implement proper authentication and authorization
+- **Configuration**: Use environment variables for sensitive configuration in production
 
-```sh
-make help
-```
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
+
+## License
+
+[Add your license information here]
+
+## Support
+
+For support and questions:
+- Create an issue in the repository
+- Contact the development team
+- Check the documentation and examples
+
+## Roadmap
+
+- [ ] Enhanced error handling and retry mechanisms
+- [ ] Metrics and monitoring integration
+- [ ] Rate limiting and throttling
+- [ ] Multi-network support (testnet, mainnet, devnet)
+- [ ] WebSocket support for real-time updates
+- [ ] Enhanced security features
+- [ ] Performance optimizations

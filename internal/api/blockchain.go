@@ -1,3 +1,5 @@
+// Package api provides the gRPC API implementations for the XRPL blockchain service.
+// It includes implementations for account management, token operations, and blockchain interactions.
 package api
 
 import (
@@ -24,14 +26,26 @@ import (
 )
 
 const (
+	// xrpToDrops represents the conversion factor from XRP to drops.
+	// 1 XRP = 1,000,000 drops in the XRPL network.
 	xrpToDrops = 1000000
 )
 
+// Blockchain represents the main interface to the XRPL blockchain.
+// It provides methods for interacting with the XRPL network, including
+// account operations, transaction submission, and token management.
 type Blockchain struct {
 	xrplClient   *client.XRPLClient
 	SystemWallet *crypto.Wallet
 }
 
+// NewBlockchain creates and returns a new Blockchain instance.
+// It initializes the XRPL client connection and system wallet using the provided configuration.
+//
+// Parameters:
+// - cfg: Network configuration containing RPC URL, timeout, and system account details
+//
+// Returns a configured Blockchain instance or an error if initialization fails.
 func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	rpcCfg, err := client.NewJsonRpcConfig(cfg.URL, client.WithHttpClient(&http.Client{
 		Timeout: time.Duration(cfg.Timeout) * time.Second,
@@ -51,6 +65,10 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	}, nil
 }
 
+// GetBaseFeeAndReserve retrieves the current base fee and reserve requirements from the XRPL network.
+// This information is used to calculate transaction costs and minimum account balances.
+//
+// Returns server ledger information including base fee and reserve amounts, or an error if the request fails.
 func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err error) {
 	resp, _, err := b.xrplClient.Server.ServerInfo(&server.ServerInfoRequest{})
 	if err != nil {
@@ -60,6 +78,14 @@ func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err 
 	return resp.Info.ValidatedLedger, nil
 }
 
+// SubmitTx submits a transaction to the XRPL network using the provided wallet.
+// The function handles transaction signing, encoding, and submission to the network.
+//
+// Parameters:
+// - w: The wallet used to sign the transaction
+// - tx: The transaction to submit
+//
+// Returns the submit response, XRPL response, and any error that occurred during submission.
 func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	resp *clienttransactions.SubmitResponse, xrplResp client.XRPLResponse, err error) {
 	if w == nil {
@@ -104,6 +130,13 @@ func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 	return b.xrplClient.Transaction.Submit(submitReq)
 }
 
+// GetAccountInfo retrieves detailed information about an XRPL account.
+// This includes the account's balance, sequence number, and other account-specific data.
+//
+// Parameters:
+// - address: The XRPL account address to query
+//
+// Returns account information or an error if the request fails.
 func (b *Blockchain) GetAccountInfo(address string) (*account.AccountInfoResponse, error) {
 	accountInfoReq := &account.AccountInfoRequest{
 		Account:     types.Address(address),
@@ -116,6 +149,13 @@ func (b *Blockchain) GetAccountInfo(address string) (*account.AccountInfoRespons
 	return accountInfo, nil
 }
 
+// GetTransactionInfo retrieves detailed information about a specific transaction.
+// This includes transaction metadata, base transaction details, and validation status.
+//
+// Parameters:
+// - hash: The transaction hash to query
+//
+// Returns transaction response, metadata, base transaction, and any error that occurred.
 func (b *Blockchain) GetTransactionInfo(hash string) (
 	resp *clienttransactions.TxResponse,
 	meta transactions.TxObjMeta,
@@ -146,14 +186,39 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 	return resp, meta, baseTx, nil
 }
 
+// PaymentFromSystemAccount transfers XRP from the system account to the specified destination.
+// This is typically used for funding new accounts or providing liquidity.
+//
+// Parameters:
+// - to: The destination account address
+// - amount: The amount to transfer in drops
+//
+// Returns the transaction hash if successful, or an error if the transfer fails.
 func (b *Blockchain) PaymentFromSystemAccount(to string, amount uint64) (hash string, err error) {
 	return b.Payment(b.SystemWallet, types.Address(to), amount)
 }
 
+// PaymentToSystemAccount transfers XRP from the specified source wallet to the system account.
+// This is typically used for reclaiming funds or collecting fees.
+//
+// Parameters:
+// - from: The source wallet
+// - amount: The amount to transfer in drops
+//
+// Returns the transaction hash if successful, or an error if the transfer fails.
 func (b *Blockchain) PaymentToSystemAccount(from *crypto.Wallet, amount uint64) (hash string, err error) {
 	return b.Payment(from, b.SystemWallet.Address, amount)
 }
 
+// Payment executes a payment transaction between two accounts.
+// The function creates, signs, and submits a payment transaction to the XRPL network.
+//
+// Parameters:
+// - from: The source wallet
+// - to: The destination account address
+// - amount: The amount to transfer in drops
+//
+// Returns the transaction hash if successful, or an error if the payment fails.
 func (b *Blockchain) Payment(from *crypto.Wallet, to types.Address, amount uint64) (hash string, err error) {
 	payment := &transactions.Payment{
 		Amount:      types.XRPCurrencyAmount(amount),
@@ -179,6 +244,14 @@ func (b *Blockchain) Payment(from *crypto.Wallet, to types.Address, amount uint6
 	return string(baseTx.Hash), nil
 }
 
+// MPTokenIssuanceCreate creates a new Multi-Purpose Token (MPT) on the XRPL network.
+// This function handles the creation of token metadata and submission of the issuance transaction.
+//
+// Parameters:
+// - w: The wallet that will own the token
+// - mpt: The MPToken containing document hash and signature information
+//
+// Returns the transaction hash and issuance ID if successful, or an error if creation fails.
 func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash, issuanceID string, err error) {
 	md, err := mpt.CreateMetadata()
 	if err != nil {
@@ -221,6 +294,14 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash,
 	return string(baseTx.Hash), issuanceID, nil
 }
 
+// AuthorizeMPToken authorizes an MPT for use by the specified wallet.
+// This is required before the token can be transferred or used in transactions.
+//
+// Parameters:
+// - w: The wallet to authorize the token for
+// - issuanceId: The ID of the token issuance to authorize
+//
+// Returns the transaction hash if successful, or an error if authorization fails.
 func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash string, err error) {
 	tx := &transactions.MPTokenAuthorize{
 		MPTokenIssuanceID: types.Hash192(issuanceId),
@@ -245,6 +326,15 @@ func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash
 	return string(baseTx.Hash), nil
 }
 
+// TransferMPToken transfers an MPT from one account to another.
+// The sender must be authorized to use the token before the transfer can succeed.
+//
+// Parameters:
+// - w: The sender's wallet
+// - issuanceId: The ID of the token issuance to transfer
+// - to: The destination account address
+//
+// Returns the transaction hash if successful, or an error if the transfer fails.
 func (b *Blockchain) TransferMPToken(w *crypto.Wallet, issuanceId, to string) (hash string, err error) {
 	tx := &transactions.Payment{
 		Amount: types.MPTCurrencyAmount{
@@ -273,6 +363,13 @@ func (b *Blockchain) TransferMPToken(w *crypto.Wallet, issuanceId, to string) (h
 	return string(baseTx.Hash), nil
 }
 
+// GetIssuerAddressFromIssuanceID extracts the issuer's address from a token issuance ID.
+// This is useful for determining the original creator of a token.
+//
+// Parameters:
+// - issuanceId: The token issuance ID to extract the issuer from
+//
+// Returns the issuer's address as a string, or an error if extraction fails.
 func (b *Blockchain) GetIssuerAddressFromIssuanceID(issuanceId string) (issuer string, err error) {
 	amount := types.MPTCurrencyAmount{
 		Value:         "1",
@@ -292,6 +389,13 @@ func (b *Blockchain) GetIssuerAddressFromIssuanceID(issuanceId string) (issuer s
 	return string(issuerAddr), nil
 }
 
+// getBaseTx is a helper function that extracts base transaction information from a submit response.
+// It validates the response and returns the base transaction if successful.
+//
+// Parameters:
+// - resp: The submit response from the XRPL network
+//
+// Returns the base transaction or an error if extraction fails.
 func (b *Blockchain) getBaseTx(resp *clienttransactions.SubmitResponse) (baseTx *transactions.BaseTx, err error) {
 	if !strings.Contains(resp.EngineResult, "SUCCESS") {
 		return nil, fmt.Errorf("failed to submit: %s, %d, %s",
@@ -312,11 +416,15 @@ func (b *Blockchain) getBaseTx(resp *clienttransactions.SubmitResponse) (baseTx 
 	return baseTx, nil
 }
 
+// MPToken represents a Multi-Purpose Token with associated metadata.
+// It contains document hash and signature information for asset-backed tokens.
 type MPToken struct {
 	DocumentHash string
 	Signature    string
 }
 
+// NewMPToken creates and returns a new MPToken instance.
+// It requires a document hash and signature for token creation.
 func NewMPToken(docHash, signature string) MPToken {
 	return MPToken{
 		DocumentHash: docHash,
@@ -324,6 +432,10 @@ func NewMPToken(docHash, signature string) MPToken {
 	}
 }
 
+// CreateMetadata generates the metadata structure required for MPT creation.
+// This includes token details, URLs, and additional information like document hash and signature.
+//
+// Returns the metadata structure or an error if creation fails.
 func (m MPToken) CreateMetadata() (ledger.MPTokenMetadata, error) {
 	addInfo, err := json.Marshal(map[string]string{
 		"document_hash": m.DocumentHash,
@@ -355,6 +467,14 @@ func (m MPToken) CreateMetadata() (ledger.MPTokenMetadata, error) {
 	}, nil
 }
 
+// CreateIssuanceID generates a unique issuance ID for the token.
+// This ID combines the issuer's account ID with the transaction sequence number.
+//
+// Parameters:
+// - issuer: The issuer's account address
+// - sequence: The transaction sequence number
+//
+// Returns the issuance ID as a string, or an error if generation fails.
 func (m MPToken) CreateIssuanceID(issuer string, sequence uint32) (string, error) {
 	_, accountID, err := addresscodec.DecodeClassicAddressToAccountID(issuer)
 	if err != nil {
