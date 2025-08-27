@@ -15,11 +15,6 @@ RUN go install github.com/google/wire/cmd/wire@v0.6.0
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.0 \
     && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
-# Copy go mod files and proto configs first for caching
-COPY go.mod go.sum ./
-COPY proto/go.mod proto/
-RUN go mod download
-
 # Copy the rest of the source
 COPY . .
 
@@ -29,8 +24,8 @@ RUN cd proto && buf generate
 # Generate wire code
 RUN cd internal/di && wire
 
-# Build the binary
-RUN GOOS=linux CGO_ENABLED=0 go build -o /app/bin/chain-xrpl ./cmd/chain-xrpl
+# Build the binary using vendor mode
+RUN GOOS=linux CGO_ENABLED=0 go build -mod=vendor -o /app/bin/chain-xrpl ./cmd/chain-xrpl
 
 # --- Final stage ---
 FROM alpine:3.22 AS final

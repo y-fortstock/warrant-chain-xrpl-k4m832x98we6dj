@@ -97,13 +97,13 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 	}
 	balance := uint64(info.AccountData.Balance)
 
-	feeRaw, reserveRaw, err := a.bc.GetBaseFeeAndReserve()
+	srvInfo, err := a.bc.GetBaseFeeAndReserve()
 	if err != nil {
 		l.Error("failed to get base fee and reserve", "error", err)
 		return nil, err
 	}
-	fee := uint64(feeRaw * xrpToDrops * 120 / 100) // 20% margin
-	reserve := uint64(reserveRaw * xrpToDrops)
+	fee := uint64(srvInfo.BaseFeeXRP * xrpToDrops * 120 / 100) // 20% margin
+	reserve := uint64((srvInfo.ReserveBaseXRP + srvInfo.ReserveIncXRP) * xrpToDrops)
 
 	if balance <= (fee + reserve) {
 		l.Warn("account balance is less or equal than fee + reserve", "balance", balance, "fee", fee, "reserve", reserve)

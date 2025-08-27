@@ -6,7 +6,7 @@ log:
 network:
   # XRPL network URL (testnet, mainnet, or local)
   # https://xrpl.org/docs/tutorials/public-servers
-  url: "https://s.altnet.rippletest.net:51234/"
+  url: "https://s.devnet.rippletest.net:51234"
   # Network timeout in seconds
   timeout: 30
   # System account configuration

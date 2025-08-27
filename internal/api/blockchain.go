@@ -51,13 +51,13 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 	}, nil
 }
 
-func (b *Blockchain) GetBaseFeeAndReserve() (fee float32, reserve float32, err error) {
+func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err error) {
 	resp, _, err := b.xrplClient.Server.ServerInfo(&server.ServerInfoRequest{})
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get base fee and reserve: %w", err)
+		return nil, fmt.Errorf("failed to get server info: %w", err)
 	}
 
-	return resp.Info.ValidatedLedger.BaseFeeXRP, resp.Info.ValidatedLedger.ReserveBaseXRP, nil
+	return resp.Info.ValidatedLedger, nil
 }
 
 func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
@@ -164,6 +164,12 @@ func (b *Blockchain) Payment(from *crypto.Wallet, to types.Address, amount uint6
 	if err != nil {
 		return "", fmt.Errorf("failed to submit: %w", err)
 	}
+	if !strings.Contains(resp.EngineResult, "SUCCESS") {
+		return "", fmt.Errorf("failed to submit: %s, %d, %s",
+			resp.EngineResult,
+			resp.EngineResultCode,
+			resp.EngineResultMessage)
+	}
 
 	baseTx, err := b.getBaseTx(resp)
 	if err != nil {
@@ -195,6 +201,13 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash,
 	if err != nil {
 		return "", "", fmt.Errorf("failed to submit tx: %w", err)
 	}
+	if !strings.Contains(resp.EngineResult, "SUCCESS") {
+		return "", "", fmt.Errorf("failed to submit: %s, %d, %s",
+			resp.EngineResult,
+			resp.EngineResultCode,
+			resp.EngineResultMessage)
+	}
+
 	issuanceID, err = mpt.CreateIssuanceID(string(w.Address), tx.Sequence)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
@@ -217,6 +230,12 @@ func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash
 	if err != nil {
 		return "", fmt.Errorf("failed to submit tx: %w", err)
 	}
+	if !strings.Contains(resp.EngineResult, "SUCCESS") {
+		return "", fmt.Errorf("failed to submit: %s, %d, %s",
+			resp.EngineResult,
+			resp.EngineResultCode,
+			resp.EngineResultMessage)
+	}
 
 	baseTx, err := b.getBaseTx(resp)
 	if err != nil {
@@ -238,6 +257,12 @@ func (b *Blockchain) TransferMPToken(w *crypto.Wallet, issuanceId, to string) (h
 	resp, _, err := b.SubmitTx(w, tx)
 	if err != nil {
 		return "", fmt.Errorf("failed to submit tx: %w", err)
+	}
+	if !strings.Contains(resp.EngineResult, "SUCCESS") {
+		return "", fmt.Errorf("failed to submit: %s, %d, %s",
+			resp.EngineResult,
+			resp.EngineResultCode,
+			resp.EngineResultMessage)
 	}
 
 	baseTx, err := b.getBaseTx(resp)
