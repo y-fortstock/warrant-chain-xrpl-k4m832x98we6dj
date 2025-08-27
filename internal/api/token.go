@@ -519,10 +519,8 @@ func (t *Token) TransactionInfo(ctx context.Context, req *tokenv1.TransactionInf
 func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleRequest) (*tokenv1.AddAddressRoleResponse, error) {
 	t.logger.Warn("AddAddressRole is not available for xrpl")
 	return &tokenv1.AddAddressRoleResponse{
-		Error: &typesv1.Error{
-			Code:        typesv1.Err_ERR_INVALID,
-			Description: "method AddAddressRole not available for xrpl",
-		},
+		Error: nil,
+		Token: nil,
 	}, nil
 }
 
