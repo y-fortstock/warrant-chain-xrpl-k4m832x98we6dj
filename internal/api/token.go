@@ -1,3 +1,5 @@
+// Package api provides the gRPC API implementations for the XRPL blockchain service.
+// It includes implementations for account management, token operations, and blockchain interactions.
 package api
 
 import (
@@ -16,19 +18,24 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Token is an implementation of tokenv1.TokenAPIServer.
+// Token implements the tokenv1.TokenAPIServer interface.
+// It provides methods for creating, managing, and transferring Multi-Purpose Tokens (MPTs) on the XRPL network.
 type Token struct {
 	tokenv1.UnimplementedTokenAPIServer
 	bc     *Blockchain
 	logger *slog.Logger
 }
 
-// NewToken returns a new Token implementation.
+// NewToken creates and returns a new Token API server instance.
+// It requires a logger and blockchain instance for operation.
 func NewToken(logger *slog.Logger, bc *Blockchain) *Token {
 	return &Token{logger: logger, bc: bc}
 }
 
-// CreateContract creates a smart contract.
+// CreateContract is not available for XRPL and returns an error response.
+// XRPL uses a different token model compared to smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) CreateContract(ctx context.Context, req *tokenv1.CreateContractRequest) (*tokenv1.CreateContractResponse, error) {
 	t.logger.Warn("CreateContract is not available for xrpl")
 	return &tokenv1.CreateContractResponse{
@@ -40,7 +47,20 @@ func (t *Token) CreateContract(ctx context.Context, req *tokenv1.CreateContractR
 	}, nil
 }
 
-// Emission emits a token.
+// Emission creates a new Multi-Purpose Token (MPT) on the XRPL network.
+// This function handles token creation, metadata generation, and network submission.
+//
+// The warehouse password must match the owner address to authorize the operation.
+// The function creates an MPT with the specified document hash and signature.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the token
+// - req.WarehouseAddressId: The warehouse account address
+// - req.OwnerAddressId: The owner account address
+// - req.Signature: The signature authorizing the token creation
+// - req.WarehousePass: The warehouse password in format "hexSeed-derivationIndex"
+//
+// Returns the created token information including issuance ID and transaction details.
 func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*tokenv1.EmissionResponse, error) {
 	l := t.logger.With("method", "Emission",
 		"document_hash", req.GetDocumentHash(),
@@ -80,7 +100,20 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	}, nil
 }
 
-// Transfer transfers a token.
+// Transfer transfers a Multi-Purpose Token from one account to another.
+// Both sender and recipient must be authorized to use the token.
+//
+// The function first authorizes the recipient for the token, then transfers it from sender to recipient.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the token
+// - req.ReceiverAddressId: The destination account address
+// - req.SenderAddressId: The source account address
+// - req.Signature: The signature authorizing the transfer
+// - req.ReceiverPass: The recipient's password in format "hexSeed-derivationIndex"
+// - req.SenderPass: The sender's password in format "hexSeed-derivationIndex"
+//
+// Returns the transfer response with transaction details.
 func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*tokenv1.TransferResponse, error) {
 	l := t.logger.With("method", "Transfer",
 		"document_hash", req.GetDocumentHash(),
@@ -135,7 +168,20 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 	}, nil
 }
 
-// TransferToCreditor transfers a warrant from owner to creditor.
+// TransferToCreditor transfers a warrant token from the owner to a creditor.
+// This is typically used in lending scenarios where collateral is transferred.
+//
+// The function authorizes the creditor for the token and then transfers ownership.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the warrant
+// - req.CreditorAddressId: The creditor's account address
+// - req.OwnerAddressId: The owner's account address
+// - req.Signature: The signature authorizing the transfer
+// - req.CreditorPass: The creditor's password in format "hexSeed-derivationIndex"
+// - req.OwnerAddressPass: The owner's password in format "hexSeed-derivationIndex"
+//
+// Returns the transfer response with transaction details.
 func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToCreditorRequest) (*tokenv1.TransferToCreditorResponse, error) {
 	l := t.logger.With("method", "TransferToCreditor",
 		"document_hash", req.GetDocumentHash(),
@@ -190,7 +236,20 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 	}, nil
 }
 
-// BuyoutFromCreditor transfers a warrant from creditor to owner.
+// BuyoutFromCreditor transfers a warrant token from the creditor back to the owner.
+// This is typically used when a loan is repaid and collateral is returned.
+//
+// The function authorizes the owner for the token and then transfers ownership back.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the warrant
+// - req.CreditorAddressId: The creditor's account address
+// - req.OwnerAddressId: The owner's account address
+// - req.Signature: The signature authorizing the transfer
+// - req.CreditorAddressPass: The creditor's password in format "hexSeed-derivationIndex"
+// - req.OwnerPass: The owner's password in format "hexSeed-derivationIndex"
+//
+// Returns the transfer response with transaction details.
 func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromCreditorRequest) (*tokenv1.BuyoutFromCreditorResponse, error) {
 	l := t.logger.With("method", "BuyoutFromCreditor",
 		"document_hash", req.GetDocumentHash(),
@@ -245,7 +304,18 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 	}, nil
 }
 
-// TransferFromOwnerToWarehouse redeems a token, transferring it from owner to warehouse.
+// TransferFromOwnerToWarehouse redeems a token by transferring it from the owner back to the warehouse.
+// This is typically used when a warrant is exercised or expired.
+//
+// The function determines the warehouse address from the issuance ID and transfers the token.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the token
+// - req.OwnerAddressId: The owner's account address
+// - req.Signature: The signature authorizing the redemption
+// - req.OwnerAddressPass: The owner's password in format "hexSeed-derivationIndex"
+//
+// Returns the redemption response with transaction details.
 func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.TransferFromOwnerToWarehouseRequest) (*tokenv1.TransferFromOwnerToWarehouseResponse, error) {
 	l := t.logger.With("method", "TransferFromOwnerToWarehouse",
 		"document_hash", req.GetDocumentHash(),
@@ -289,7 +359,18 @@ func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.T
 	}, nil
 }
 
-// TransferFromCreditorToWarehouse redeems a token, transferring it from creditor to warehouse.
+// TransferFromCreditorToWarehouse redeems a token by transferring it from the creditor back to the warehouse.
+// This is typically used when a warrant is exercised or expired while held by a creditor.
+//
+// The function determines the warehouse address from the issuance ID and transfers the token.
+//
+// Parameters:
+// - req.DocumentHash: The hash of the document backing the token
+// - req.CreditorAddressId: The creditor's account address
+// - req.Signature: The signature authorizing the redemption
+// - req.CreditorAddressPass: The creditor's password in format "hexSeed-derivationIndex"
+//
+// Returns the redemption response with transaction details.
 func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv1.TransferFromCreditorToWarehouseRequest) (*tokenv1.TransferFromCreditorToWarehouseResponse, error) {
 	l := t.logger.With("method", "TransferFromOwnerToWarehouse",
 		"document_hash", req.GetDocumentHash(),
@@ -333,7 +414,10 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 	}, nil
 }
 
-// InitiateReplacement initiates a replacement.
+// InitiateReplacement is not available for XRPL and returns an error response.
+// XRPL tokens do not support the replacement mechanism used in smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) InitiateReplacement(ctx context.Context, req *tokenv1.InitiateReplacementRequest) (*tokenv1.InitiateReplacementResponse, error) {
 	t.logger.Warn("InitiateReplacement is not available for xrpl")
 	return &tokenv1.InitiateReplacementResponse{
@@ -344,7 +428,10 @@ func (t *Token) InitiateReplacement(ctx context.Context, req *tokenv1.InitiateRe
 	}, nil
 }
 
-// PrepareToReplace prepares to replace.
+// PrepareToReplace is not available for XRPL and returns an error response.
+// XRPL tokens do not support the replacement mechanism used in smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) PrepareToReplace(ctx context.Context, req *tokenv1.PrepareToReplaceRequest) (*tokenv1.PrepareToReplaceResponse, error) {
 	t.logger.Warn("PrepareToReplace is not available for xrpl")
 	return &tokenv1.PrepareToReplaceResponse{
@@ -355,7 +442,10 @@ func (t *Token) PrepareToReplace(ctx context.Context, req *tokenv1.PrepareToRepl
 	}, nil
 }
 
-// Replace replaces a token.
+// Replace is not available for XRPL and returns an error response.
+// XRPL tokens do not support the replacement mechanism used in smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) Replace(ctx context.Context, req *tokenv1.ReplaceRequest) (*tokenv1.ReplaceResponse, error) {
 	t.logger.Warn("Replace is not available for xrpl")
 	return &tokenv1.ReplaceResponse{
@@ -366,7 +456,10 @@ func (t *Token) Replace(ctx context.Context, req *tokenv1.ReplaceRequest) (*toke
 	}, nil
 }
 
-// RevertReplacement reverts a replacement.
+// RevertReplacement is not available for XRPL and returns an error response.
+// XRPL tokens do not support the replacement mechanism used in smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) RevertReplacement(ctx context.Context, req *tokenv1.RevertReplacementRequest) (*tokenv1.RevertReplacementResponse, error) {
 	t.logger.Warn("RevertReplacement is not available for xrpl")
 	return &tokenv1.RevertReplacementResponse{
@@ -377,7 +470,13 @@ func (t *Token) RevertReplacement(ctx context.Context, req *tokenv1.RevertReplac
 	}, nil
 }
 
-// TransactionInfo returns transaction info.
+// TransactionInfo retrieves detailed information about a specific transaction.
+// This includes transaction status, fees, and other metadata from the XRPL network.
+//
+// Parameters:
+// - req.TransactionId: The transaction hash to query
+//
+// Returns detailed transaction information including status, fees, and confirmation details.
 func (t *Token) TransactionInfo(ctx context.Context, req *tokenv1.TransactionInfoRequest) (*tokenv1.TransactionInfoResponse, error) {
 	l := t.logger.With("method", "TransactionInfo",
 		"transaction_hash", req.GetTransactionId())
@@ -413,7 +512,10 @@ func (t *Token) TransactionInfo(ctx context.Context, req *tokenv1.TransactionInf
 	}, nil
 }
 
-// AddAddressRole sets an address role.
+// AddAddressRole is not available for XRPL and returns an error response.
+// XRPL does not support role-based access control in the same way as smart contract platforms.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleRequest) (*tokenv1.AddAddressRoleResponse, error) {
 	t.logger.Warn("AddAddressRole is not available for xrpl")
 	return &tokenv1.AddAddressRoleResponse{
@@ -424,7 +526,10 @@ func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleR
 	}, nil
 }
 
-// PauseContract pauses the contract.
+// PauseContract is not available for XRPL and returns an error response.
+// XRPL tokens cannot be paused in the same way as smart contracts.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) PauseContract(ctx context.Context, req *tokenv1.PauseContractRequest) (*tokenv1.PauseContractResponse, error) {
 	t.logger.Warn("PauseContract is not available for xrpl")
 	return &tokenv1.PauseContractResponse{
@@ -435,7 +540,10 @@ func (t *Token) PauseContract(ctx context.Context, req *tokenv1.PauseContractReq
 	}, nil
 }
 
-// ResumeContract resumes the contract.
+// ResumeContract is not available for XRPL and returns an error response.
+// XRPL tokens cannot be paused in the same way as smart contracts.
+//
+// Returns an error response indicating that this method is not supported on XRPL.
 func (t *Token) ResumeContract(ctx context.Context, req *tokenv1.ResumeContractRequest) (*tokenv1.ResumeContractResponse, error) {
 	t.logger.Warn("ResumeContract is not available for xrpl")
 	return &tokenv1.ResumeContractResponse{
