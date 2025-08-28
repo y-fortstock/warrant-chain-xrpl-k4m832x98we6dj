@@ -26,3 +26,7 @@ func (a Address) Validate() error {
 	// TODO checksum
 	return nil
 }
+
+func (a Address) String() string {
+	return string(a)
+}

@@ -5,7 +5,7 @@ go 1.24
 toolchain go1.24.5
 
 require (
-	github.com/CreatureDev/xrpl-go v0.0.0-20250825080922-a4c65a9a890f
+	github.com/CreatureDev/xrpl-go v0.0.0-20250828115537-7c067c84be1c
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/decen-one/go-bip39 v0.0.0-20230726170506-e45ab587d13e
@@ -20,7 +20,7 @@ require (
 )
 
 replace (
-	github.com/CreatureDev/xrpl-go => github.com/UndeadDemidov/xrpl-go v0.0.0-20250825080922-a4c65a9a890f
+	github.com/CreatureDev/xrpl-go => github.com/UndeadDemidov/xrpl-go v0.0.0-20250828115537-7c067c84be1c
 	gitlab.com/warrant1/warrant/protobuf => ./proto
 )
 
