@@ -133,8 +133,15 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 
 	if balance <= (fee + reserve) {
 		l.Warn("account balance is less or equal than fee + reserve", "balance", balance, "fee", fee, "reserve", reserve)
-		return nil, fmt.Errorf("account balance is less or equal than fee + reserve: %d <= %d", balance, fee+reserve)
+
+		return &accountv1.ClearBalanceResponse{
+			Transaction: &typesv1.Transaction{
+				Id:        "0",
+				BlockTime: uint64(time.Now().Unix()),
+			},
+		}, nil
 	}
+
 	amount := balance - (fee + reserve)
 
 	l.Info("payment to system account", "fee", fee, "reserve", reserve, "amount", amount)
@@ -170,6 +177,11 @@ func (a *Account) GetBalance(ctx context.Context, req *accountv1.GetBalanceReque
 
 	info, err := a.bc.GetAccountInfo(req.GetAccountId())
 	if err != nil {
+		if strings.Contains(err.Error(), "actNotFound") {
+			return &accountv1.GetBalanceResponse{
+				Balance: "0",
+			}, nil
+		}
 		l.Error("failed to get account balance", "error", err)
 		return nil, err
 	}

@@ -65,26 +65,63 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	l := t.logger.With("method", "Emission",
 		"document_hash", req.GetDocumentHash(),
 		"warehouse_id", req.GetWarehouseAddressId())
-	l.Debug("start",
-		"owner_address_id", req.GetOwnerAddressId(),
-		"signature", req.GetSignature())
+	l.Debug("start", "owner_address_id", req.GetOwnerAddressId())
 
 	seeds := strings.Split(req.GetWarehousePass(), "-")
-	w, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
+	warehouse, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		l.Error("failed to create wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create wallet: %v", err)
 	}
-	if strings.ToLower(string(w.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
-		l.Error("warehouse address does not match", "warehouse_address", string(w.Address))
+	if strings.ToLower(string(warehouse.Address)) != strings.ToLower(req.GetWarehouseAddressId()) {
+		l.Error("warehouse address does not match", "warehouse_address", string(warehouse.Address))
 		return nil, status.Errorf(codes.InvalidArgument, "warehouse address does not match")
 	}
 
+	if req.GetOwnerPass() == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "owner pass is required")
+	}
+	ownerSeeds := strings.Split(req.GetOwnerPass(), "-")
+	owner, err := crypto.NewWalletFromHexSeed(ownerSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", ownerSeeds[1]))
+	if err != nil {
+		l.Error("failed to create owner wallet", "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to create owner wallet: %v", err)
+	}
+	if strings.ToLower(string(owner.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
+		l.Error("owner address does not match", "owner_address", string(owner.Address))
+		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
+	}
+
+	l.Debug("issuing mpt token")
 	mpt := NewMPToken(req.GetDocumentHash(), req.GetSignature())
-	hash, issuanceID, err := t.bc.MPTokenIssuanceCreate(w, mpt)
+	hash, issuanceID, err := t.bc.MPTokenIssuanceCreate(warehouse, mpt)
 	if err != nil {
 		l.Error("failed to create issuance", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to create issuance: %v", err)
+	}
+
+	for {
+		time.Sleep(4 * time.Second)
+		_, meta, _, err := t.bc.GetTransactionInfo(hash)
+		if err != nil {
+			l.Error("failed to get transaction info", "error", err)
+		}
+		if strings.Contains(meta.TransactionResult, "SUCCESS") {
+			break
+		}
+	}
+
+	l.Debug("authorizing token", "issuance_id", issuanceID)
+	_, err = t.bc.AuthorizeMPToken(owner, issuanceID)
+	if err != nil {
+		l.Warn("failed to authorize token", "error", err)
+	}
+
+	l.Debug("transferring token to owner", "issuance_id", issuanceID)
+	hash, err = t.bc.TransferMPToken(warehouse, issuanceID, string(owner.Address))
+	if err != nil {
+		l.Error("failed to transfer token", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
 	}
 
 	return &tokenv1.EmissionResponse{
@@ -119,8 +156,9 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		"document_hash", req.GetDocumentHash(),
 		"reciever_address_id", req.GetReceiverAddressId(),
 		"sender_address_id", req.GetSenderAddressId(),
+		"token_id", req.GetTokenId(),
 	)
-	l.Debug("start", "signature", req.GetSignature())
+	l.Debug("start")
 
 	recipientSeeds := strings.Split(req.GetReceiverPass(), "-")
 	recipient, err := crypto.NewWalletFromHexSeed(recipientSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", recipientSeeds[1]))
@@ -144,12 +182,12 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		return nil, status.Errorf(codes.InvalidArgument, "sender address does not match")
 	}
 
-	_, err = t.bc.AuthorizeMPToken(recipient, req.GetDocumentHash())
+	_, err = t.bc.AuthorizeMPToken(recipient, req.GetTokenId())
 	if err != nil {
 		l.Warn("failed to authorize token", "error", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(sender, req.GetDocumentHash(), string(recipient.Address))
+	hash, err := t.bc.TransferMPToken(sender, req.GetTokenId(), string(recipient.Address))
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -187,8 +225,9 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		"document_hash", req.GetDocumentHash(),
 		"creditor_address_id", req.GetCreditorAddressId(),
 		"owner_address_id", req.GetOwnerAddressId(),
+		"token_id", req.GetTokenId(),
 	)
-	l.Debug("start", "signature", req.GetSignature())
+	l.Debug("start")
 
 	creditorSeeds := strings.Split(req.GetCreditorPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
@@ -212,12 +251,28 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	_, err = t.bc.AuthorizeMPToken(creditor, req.GetDocumentHash())
+	_, err = t.bc.GetAccountInfo(string(creditor.Address))
+	if err != nil {
+		// Account doesn't exist, send 2 XRP to fund it
+		l.Info("creditor account does not exist, funding with 2 XRP")
+		// 1 XRP = 1,000,000 drops in the XRPL network
+		hash, err := t.bc.PaymentFromSystemAccount(string(creditor.Address), 2*1000000)
+		if err != nil {
+			l.Error("failed to fund creditor account", "error", err)
+			return nil, status.Errorf(codes.Internal, "failed to fund creditor account: %v", err)
+		}
+		l.Info("successfully funded creditor account", "hash", hash, "amount", "2 XRP")
+	}
+
+	l.Debug("authorizing token")
+	hash, err := t.bc.AuthorizeMPToken(creditor, req.GetTokenId())
 	if err != nil {
 		l.Warn("failed to authorize token", "error", err)
 	}
+	l.Debug("authorized token", "hash", hash)
 
-	hash, err := t.bc.TransferMPToken(owner, req.GetDocumentHash(), string(creditor.Address))
+	l.Debug("transferring token to creditor")
+	hash, err = t.bc.TransferMPToken(owner, req.GetTokenId(), string(creditor.Address))
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -255,8 +310,9 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		"document_hash", req.GetDocumentHash(),
 		"creditor_address_id", req.GetCreditorAddressId(),
 		"owner_address_id", req.GetOwnerAddressId(),
+		"token_id", req.GetTokenId(),
 	)
-	l.Debug("start", "signature", req.GetSignature())
+	l.Debug("start")
 
 	creditorSeeds := strings.Split(req.GetCreditorAddressPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
@@ -280,12 +336,12 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	_, err = t.bc.AuthorizeMPToken(owner, req.GetDocumentHash())
+	_, err = t.bc.AuthorizeMPToken(owner, req.GetTokenId())
 	if err != nil {
 		l.Warn("failed to authorize token", "error", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(creditor, req.GetDocumentHash(), string(owner.Address))
+	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), string(owner.Address))
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -320,8 +376,9 @@ func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.T
 	l := t.logger.With("method", "TransferFromOwnerToWarehouse",
 		"document_hash", req.GetDocumentHash(),
 		"owner_address_id", req.GetOwnerAddressId(),
+		"token_id", req.GetTokenId(),
 	)
-	l.Debug("start", "signature", req.GetSignature())
+	l.Debug("start")
 
 	ownerSeeds := strings.Split(req.GetOwnerAddressPass(), "-")
 	owner, err := crypto.NewWalletFromHexSeed(ownerSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", ownerSeeds[1]))
@@ -334,13 +391,13 @@ func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.T
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(req.GetDocumentHash())
+	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(req.GetTokenId())
 	if err != nil {
 		l.Error("failed to get issuer address", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to get issuer address: %v", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(owner, req.GetDocumentHash(), issuerAddr)
+	hash, err := t.bc.TransferMPToken(owner, req.GetTokenId(), issuerAddr)
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -375,8 +432,9 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 	l := t.logger.With("method", "TransferFromOwnerToWarehouse",
 		"document_hash", req.GetDocumentHash(),
 		"creditor_address_id", req.GetCreditorAddressId(),
+		"token_id", req.GetTokenId(),
 	)
-	l.Debug("start", "signature", req.GetSignature())
+	l.Debug("start")
 
 	creditorSeeds := strings.Split(req.GetCreditorAddressPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
@@ -389,13 +447,13 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 		return nil, status.Errorf(codes.InvalidArgument, "creditor address does not match")
 	}
 
-	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(req.GetDocumentHash())
+	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(req.GetTokenId())
 	if err != nil {
 		l.Error("failed to get issuer address", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to get issuer address: %v", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(creditor, req.GetDocumentHash(), issuerAddr)
+	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), issuerAddr)
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -497,17 +555,18 @@ func (t *Token) TransactionInfo(ctx context.Context, req *tokenv1.TransactionInf
 	return &tokenv1.TransactionInfoResponse{
 		Error: nil,
 		Transaction: &typesv1.Transaction{
-			// BlockCount: 1,
 			Id:             req.GetTransactionId(),
 			BlockNumber:    []byte(fmt.Sprintf("%d", resp.LedgerIndex)),
 			BlockTime:      uint64(resp.Date),
 			FullyConfirmed: strings.Contains(meta.TransactionResult, "SUCCESS"),
-			IsSuccess:      resp.Validated,
 			GasUsed:        fee,
 			GasPrice:       1,
 			Method:         string(baseTx.TransactionType),
 			Input:          fmt.Sprintf("%d", baseTx.Fee),
 			Events:         nil,
+			// backend use next values to define if transaction is completed
+			BlockCount: 1000,
+			IsSuccess:  resp.Validated,
 		},
 	}, nil
 }
@@ -520,7 +579,14 @@ func (t *Token) AddAddressRole(ctx context.Context, req *tokenv1.AddAddressRoleR
 	t.logger.Warn("AddAddressRole is not available for xrpl")
 	return &tokenv1.AddAddressRoleResponse{
 		Error: nil,
-		Token: nil,
+		Token: &tokenv1.Token{
+			Id: "no token id",
+			Transaction: &typesv1.Transaction{
+				Id:        "no transaction id",
+				BlockTime: uint64(time.Now().Unix()),
+				IsSuccess: true,
+			},
+		},
 	}, nil
 }
 
