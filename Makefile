@@ -1,6 +1,6 @@
 # Makefile для chain-xrpl
 
-.PHONY: docker-make deps gen submodule-update regen build run test-api stop help
+.PHONY: docker-make deps gen submodule-update regen build run test-api stop help image k3d
 
 setup:
 	docker network create athens-net || true
@@ -27,7 +27,9 @@ gen:
 
 submodule-update:
 	git submodule update --init --recursive
-	git submodule foreach git pull origin master 
+	git submodule foreach git pull origin master
+	go mod tidy
+	go mod vendor
 
 regen: submodule-update deps gen
 
@@ -51,6 +53,13 @@ stop:
 
 rerun: stop run
 
+image:
+	docker build -t localhost:5010/warrant1/warrant/chain-xrpl:latest .
+	docker push localhost:5010/warrant1/warrant/chain-xrpl:latest
+
+k3d: image
+	kubectl rollout restart deployment chain-xrpl -n warrant
+
 help:
 	@echo "\033[1;33mAvailable commands:\033[0m"
 	@echo "  \033[1;33mdocker-make\033[0m       \033[0;37m- Build Docker image for make environment\033[0m"
@@ -63,3 +72,5 @@ help:
 	@echo "  \033[1;33mrun\033[0m               \033[0;37m- Run chain-xrpl container on port 8099\033[0m"
 	@echo "  \033[1;33mstop\033[0m              \033[0;37m- Stop chain-xrpl container\033[0m"
 	@echo "  \033[1;33mtest-api\033[0m          \033[0;37m- Run grpcurl tests\033[0m"
+	@echo "  \033[1;33mimage\033[0m             \033[0;37m- Build Docker image for chain-xrpl\033[0m"
+	@echo "  \033[1;33mk3d\033[0m               \033[0;37m- Rollout restart deployment chain-xrpl in k3d\033[0m"

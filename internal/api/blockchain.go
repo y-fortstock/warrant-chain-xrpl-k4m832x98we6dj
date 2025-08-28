@@ -311,6 +311,9 @@ func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash
 	if err != nil {
 		return "", fmt.Errorf("failed to submit tx: %w", err)
 	}
+	// TODO: remove this
+	fmt.Println("resp", resp)
+
 	if !strings.Contains(resp.EngineResult, "SUCCESS") {
 		return "", fmt.Errorf("failed to submit: %s, %d, %s",
 			resp.EngineResult,
@@ -439,7 +442,7 @@ func NewMPToken(docHash, signature string) MPToken {
 func (m MPToken) CreateMetadata() (ledger.MPTokenMetadata, error) {
 	addInfo, err := json.Marshal(map[string]string{
 		"document_hash": m.DocumentHash,
-		"signature":     m.Signature,
+		// "signature":     m.Signature,
 	})
 	if err != nil {
 		return ledger.MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)

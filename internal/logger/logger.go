@@ -46,9 +46,15 @@ func NewLogger(cfg config.LogConfig) *slog.Logger {
 	}
 	switch cfg.Format {
 	case "json":
-		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     level,
+			AddSource: true,
+		})
 	default:
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     level,
+			AddSource: true,
+		})
 	}
 	return slog.New(handler)
 }

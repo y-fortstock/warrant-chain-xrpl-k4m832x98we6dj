@@ -15,6 +15,7 @@ type TxResponse struct {
 	Meta        transactions.TxMeta `json:"meta"`
 	Validated   bool                `json:"validated"`
 	Tx          transactions.Tx     `json:",omitempty"`
+	Status      string              `json:"status"`
 }
 
 // Custom marshal in order to embed transaction fields on the lowerst level
@@ -49,6 +50,7 @@ func (r *TxResponse) UnmarshalJSON(data []byte) error {
 		LedgerIndex common.LedgerIndex `json:"ledger_index"`
 		Meta        json.RawMessage    `json:"meta"`
 		Validated   bool               `json:"validated"`
+		Status      string             `json:"status"`
 	}
 	var h txrHelper
 	err := json.Unmarshal(data, &h)
@@ -60,6 +62,7 @@ func (r *TxResponse) UnmarshalJSON(data []byte) error {
 		Hash:        h.Hash,
 		LedgerIndex: h.LedgerIndex,
 		Validated:   h.Validated,
+		Status:      h.Status,
 	}
 	r.Meta, err = transactions.UnmarshalTxMeta(h.Meta)
 	if err != nil {
