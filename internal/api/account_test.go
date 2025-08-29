@@ -212,7 +212,7 @@ func TestAccount_Create_DifferentDerivationPaths(t *testing.T) {
 	ctx := context.Background()
 
 	// Test that different derivation indices give different addresses
-	indices := []string{"0", "1", "2", "10", "100"}
+	indices := []string{"0", "1", "2", "10", "100", "1000", "10000", "100000"}
 	addresses := make(map[string]bool)
 
 	for _, index := range indices {
