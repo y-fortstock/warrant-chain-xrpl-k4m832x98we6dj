@@ -5,8 +5,11 @@ import (
 	"testing"
 
 	"github.com/CreatureDev/xrpl-go/model/client/server"
+	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
+	"github.com/CreatureDev/xrpl-go/model/transactions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 )
 
 func TestBlockchain_GetBaseFeeAndReserve(t *testing.T) {
@@ -86,12 +89,12 @@ func TestBlockchain_GetBaseFeeAndReserve(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				if tt.expectedInfo != nil {
-					require.NotNil(t, result)
+					assert.NotNil(t, result)
 					assert.Equal(t, tt.expectedInfo.BaseFeeXRP, result.BaseFeeXRP)
 					assert.Equal(t, tt.expectedInfo.ReserveBaseXRP, result.ReserveBaseXRP)
 					assert.Equal(t, tt.expectedInfo.ReserveIncXRP, result.ReserveIncXRP)
 				} else {
-					require.Nil(t, result)
+					assert.Nil(t, result)
 				}
 			}
 		})
@@ -128,4 +131,93 @@ func TestBlockchain_GetBaseFeeAndReserve_Integration(t *testing.T) {
 	mockClient.ResetCallCounts()
 	callCounts = mockClient.GetCallCounts()
 	require.Equal(t, 0, callCounts["ServerInfo"], "Call count should be reset to zero")
+}
+
+// TestTx is a simple test transaction that implements the transactions.Tx interface
+type TestTx struct{}
+
+func (t TestTx) TxType() transactions.TxType { return transactions.PaymentTx }
+
+func TestBlockchain_SubmitTx(t *testing.T) {
+	tests := []struct {
+		name          string
+		wallet        *crypto.Wallet
+		transaction   interface{}
+		expectedError string
+	}{
+		{
+			name:          "nil wallet",
+			wallet:        nil,
+			transaction:   TestTx{},
+			expectedError: "wallet cannot be nil",
+		},
+		{
+			name:          "nil transaction",
+			wallet:        &crypto.Wallet{},
+			transaction:   nil,
+			expectedError: "transaction cannot be nil",
+		},
+		{
+			name: "invalid wallet - empty address",
+			wallet: &crypto.Wallet{
+				Address:    "",
+				PublicKey:  "test",
+				PrivateKey: "test",
+			},
+			transaction:   TestTx{},
+			expectedError: "wallet is invalid",
+		},
+		{
+			name: "invalid wallet - empty public key",
+			wallet: &crypto.Wallet{
+				Address:    "rTestAddress123456789",
+				PublicKey:  "",
+				PrivateKey: "test",
+			},
+			transaction:   TestTx{},
+			expectedError: "wallet is invalid",
+		},
+		{
+			name: "invalid wallet - empty private key",
+			wallet: &crypto.Wallet{
+				Address:    "rTestAddress123456789",
+				PublicKey:  "test",
+				PrivateKey: "",
+			},
+			transaction:   TestTx{},
+			expectedError: "wallet is invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock client
+			mockClient := NewMockClient()
+
+			// Create blockchain instance with mock client
+			blockchain := &Blockchain{
+				xrplClient: CreateMockXRPLClient(mockClient),
+			}
+
+			// Call the method under test
+			var result *clienttransactions.SubmitResponse
+			var err error
+			if tt.transaction == nil {
+				result, _, err = blockchain.SubmitTx(tt.wallet, nil)
+			} else {
+				result, _, err = blockchain.SubmitTx(tt.wallet, tt.transaction.(transactions.Tx))
+			}
+
+			// Verify results
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.expectedError)
+			require.Empty(t, result)
+
+			// Verify no calls were made to external services
+			callCounts := mockClient.GetCallCounts()
+			require.Equal(t, 0, callCounts["AccountInfo"], "AccountInfo should not be called for invalid inputs")
+			require.Equal(t, 0, callCounts["ServerInfo"], "ServerInfo should not be called for invalid inputs")
+			require.Equal(t, 0, callCounts["Submit"], "Submit should not be called for invalid inputs")
+		})
+	}
 }

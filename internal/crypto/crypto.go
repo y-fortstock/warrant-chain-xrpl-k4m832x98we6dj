@@ -48,19 +48,16 @@ func GetExtendedKeyFromHexSeedWithPath(hexSeed string, path string) (*hdkeychain
 // Returns an extended key derived along the specified path, or an error if derivation fails.
 // The function uses MainNet parameters for key derivation.
 func GetExtendedKeyFromSeedWithPath(seed []byte, path string) (*hdkeychain.ExtendedKey, error) {
-	// Создаем master key с параметрами MainNet
 	masterKey, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create master key: %w", err)
 	}
 
-	// Парсим путь BIP-44
 	derivationPath, err := parseDerivationPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse derivation path: %w", err)
 	}
 
-	// Проходим по всем уровням пути
 	currentKey := masterKey
 	for i, childIndex := range derivationPath {
 		currentKey, err = currentKey.Derive(childIndex)
@@ -88,12 +85,10 @@ func parseDerivationPath(path string) ([]uint32, error) {
 		return nil, fmt.Errorf("path is empty")
 	}
 
-	// Убираем префикс "m/" если он есть
 	if len(path) >= 2 && path[:2] == "m/" {
 		path = path[2:]
 	}
 
-	// Разбиваем путь по "/"
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid path format")
@@ -101,14 +96,12 @@ func parseDerivationPath(path string) ([]uint32, error) {
 
 	derivationPath := make([]uint32, len(parts))
 	for i, part := range parts {
-		// Проверяем на hardened derivation (с апострофом)
 		hardened := false
 		if strings.HasSuffix(part, "'") {
 			hardened = true
 			part = part[:len(part)-1]
 		}
 
-		// Парсим число
 		index, err := strconv.ParseUint(part, 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("invalid path component %s: %w", part, err)
