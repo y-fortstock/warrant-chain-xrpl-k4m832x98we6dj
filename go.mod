@@ -12,7 +12,7 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/ucarion/redact v0.0.0-20190527210305-5ee85e474909
 	gitlab.com/warrant1/warrant/protobuf v0.0.0-00010101000000-000000000000
 	golang.org/x/sync v0.16.0

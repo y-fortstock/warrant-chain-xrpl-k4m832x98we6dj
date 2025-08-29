@@ -1,771 +1,131 @@
 package api
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/CreatureDev/xrpl-go/model/client/account"
-	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
 	"github.com/CreatureDev/xrpl-go/model/client/server"
-	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
-	"github.com/CreatureDev/xrpl-go/model/ledger"
-	"github.com/CreatureDev/xrpl-go/model/transactions"
-	"github.com/CreatureDev/xrpl-go/model/transactions/types"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
-	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
+	"github.com/stretchr/testify/require"
 )
-
-// XRPLClientInterface определяет интерфейс для XRPL клиента
-type XRPLClientInterface interface {
-	Account() AccountInterface
-	Server() ServerInterface
-}
-
-// AccountInterface определяет интерфейс для работы с аккаунтами
-type AccountInterface interface {
-	AccountInfo(req *account.AccountInfoRequest) (*account.AccountInfoResponse, interface{}, error)
-}
-
-// ServerInterface определяет интерфейс для работы с сервером
-type ServerInterface interface {
-	Fee(req *server.FeeRequest) (*server.FeeResponse, interface{}, error)
-	ServerInfo(req *server.ServerInfoRequest) (*server.ServerInfoResponse, interface{}, error)
-}
-
-// TransactionInterface определяет интерфейс для работы с транзакциями
-type TransactionInterface interface {
-	Submit(req *clienttransactions.SubmitRequest) (*clienttransactions.SubmitResponse, interface{}, error)
-	Tx(req *clienttransactions.TxRequest) (*clienttransactions.TxResponse, interface{}, error)
-}
-
-// BlockchainInterface определяет интерфейс для Blockchain
-type BlockchainInterface interface {
-	GetXRPLWallet(hexSeed string, path string) (address string, private string, err error)
-	GetAccountBalance(address string) (uint64, error)
-	GetBaseFee() (uint64, error)
-	GetBaseFeeAndReserve() (fee float32, reserve float32, err error)
-}
-
-// TestBlockchain - тестовая версия Blockchain с мок клиентом
-type TestBlockchain struct {
-	accountMock     *MockAccount
-	serverMock      *MockServer
-	transactionMock *MockTransaction
-	systemAccount   string
-	systemSecret    string
-}
-
-func (tb *TestBlockchain) GetXRPLWallet(hexSeed string, path string) (address string, public string, private string, err error) {
-	// Используем реальную логику для GetXRPLWallet, так как она не зависит от XRPL клиента
-	extendedKey, err := crypto.GetExtendedKeyFromHexSeedWithPath(hexSeed, path)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get extended key from hex seed: %w", err)
-	}
-	address, public, private, err = crypto.GetXRPLWallet(extendedKey)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get xrpl wallet: %w", err)
-	}
-	return address, public, private, nil
-}
-
-func (tb *TestBlockchain) GetAccountBalance(address string) (uint64, error) {
-	xrplReq := &account.AccountInfoRequest{
-		Account:     types.Address(address),
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	resp, xrplRes, err := tb.accountMock.AccountInfo(xrplReq)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get account info for %s: %w (xrplRes: %v)", address, err, xrplRes)
-	}
-
-	return uint64(resp.AccountData.Balance), nil
-}
-
-func (tb *TestBlockchain) GetBaseFee() (uint64, error) {
-	xrplReq := &server.FeeRequest{}
-	resp, xrplRes, err := tb.serverMock.Fee(xrplReq)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get base fee: %w (xrplRes: %v)", err, xrplRes)
-	}
-	return uint64(resp.Drops.BaseFee), nil
-}
-
-func (tb *TestBlockchain) GetBaseFeeAndReserve() (fee float32, reserve float32, err error) {
-	resp, _, err := tb.serverMock.ServerInfo(&server.ServerInfoRequest{})
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get base fee and reserve: %w", err)
-	}
-
-	return resp.Info.ValidatedLedger.BaseFeeXRP, resp.Info.ValidatedLedger.ReserveBaseXRP, nil
-}
-
-func (tb *TestBlockchain) GetAccountInfo(address string) (*account.AccountInfoResponse, error) {
-	accountInfoReq := &account.AccountInfoRequest{
-		Account:     types.Address(address),
-		LedgerIndex: clientcommon.VALIDATED,
-	}
-	accountInfo, _, err := tb.accountMock.AccountInfo(accountInfoReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get account info: %w", err)
-	}
-	return accountInfo, nil
-}
-
-func (tb *TestBlockchain) GetTransactionInfo(hash string) (
-	resp *clienttransactions.TxResponse,
-	meta transactions.TxObjMeta,
-	baseTx *transactions.BaseTx,
-	err error) {
-	resp, _, err = tb.transactionMock.Tx(&clienttransactions.TxRequest{
-		Transaction: hash,
-	})
-	if err != nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to get transaction info: %w", err)
-	}
-
-	if resp.Meta == nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("metadata is nil")
-	}
-	if resp.Tx == nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction is nil")
-	}
-
-	if objMeta, ok := resp.Meta.(transactions.TxObjMeta); ok {
-		meta = objMeta
-	}
-	baseTx = transactions.BaseTxForTransaction(resp.Tx)
-	if baseTx == nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract base transaction from transaction")
-	}
-
-	return resp, meta, baseTx, nil
-}
-
-// MockXRPLClient - мок для XRPL клиента
-type MockXRPLClient struct {
-	accountMock     *MockAccount
-	serverMock      *MockServer
-	transactionMock *MockTransaction
-}
-
-func (m *MockXRPLClient) Account() AccountInterface {
-	return m.accountMock
-}
-
-func (m *MockXRPLClient) Server() ServerInterface {
-	return m.serverMock
-}
-
-func (m *MockXRPLClient) Transaction() TransactionInterface {
-	return m.transactionMock
-}
-
-func (m *MockXRPLClient) AutofillTx(address types.Address, tx transactions.Tx) error {
-	// Простая реализация для тестов
-	return nil
-}
-
-// MockAccount - мок для работы с аккаунтами
-type MockAccount struct {
-	accountInfoFunc func(req *account.AccountInfoRequest) (*account.AccountInfoResponse, interface{}, error)
-}
-
-func (m *MockAccount) AccountInfo(req *account.AccountInfoRequest) (*account.AccountInfoResponse, interface{}, error) {
-	if m.accountInfoFunc != nil {
-		return m.accountInfoFunc(req)
-	}
-	return nil, nil, nil
-}
-
-// MockServer - мок для работы с сервером
-type MockServer struct {
-	feeFunc        func(req *server.FeeRequest) (*server.FeeResponse, interface{}, error)
-	serverInfoFunc func(req *server.ServerInfoRequest) (*server.ServerInfoResponse, interface{}, error)
-}
-
-func (m *MockServer) Fee(req *server.FeeRequest) (*server.FeeResponse, interface{}, error) {
-	if m.feeFunc != nil {
-		return m.feeFunc(req)
-	}
-	return nil, nil, nil
-}
-
-func (m *MockServer) ServerInfo(req *server.ServerInfoRequest) (*server.ServerInfoResponse, interface{}, error) {
-	if m.serverInfoFunc != nil {
-		return m.serverInfoFunc(req)
-	}
-	return nil, nil, nil
-}
-
-// MockTransaction - мок для работы с транзакциями
-type MockTransaction struct {
-	submitFunc func(req *clienttransactions.SubmitRequest) (*clienttransactions.SubmitResponse, interface{}, error)
-	txFunc     func(req *clienttransactions.TxRequest) (*clienttransactions.TxResponse, interface{}, error)
-}
-
-func (m *MockTransaction) Submit(req *clienttransactions.SubmitRequest) (*clienttransactions.SubmitResponse, interface{}, error) {
-	if m.submitFunc != nil {
-		return m.submitFunc(req)
-	}
-	return nil, nil, nil
-}
-
-func (m *MockTransaction) Tx(req *clienttransactions.TxRequest) (*clienttransactions.TxResponse, interface{}, error) {
-	if m.txFunc != nil {
-		return m.txFunc(req)
-	}
-	return nil, nil, nil
-}
-
-// createMockBlockchain создает blockchain с мок клиентом для тестирования
-func createMockBlockchain() *TestBlockchain {
-	return &TestBlockchain{
-		accountMock:     &MockAccount{},
-		serverMock:      &MockServer{},
-		transactionMock: &MockTransaction{},
-		systemAccount:   "rTestAccount",
-		systemSecret:    "testSecret",
-	}
-}
-
-var (
-	validHexSeed   = "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
-	validAddress   = "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
-	invalidHexSeed = "invalid_hex_seed"
-)
-
-func TestNewBlockchain(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfg     config.NetworkConfig
-		wantErr bool
-	}{
-		{
-			name: "valid network config",
-			cfg: config.NetworkConfig{
-				URL: "https://s.altnet.rippletest.net:51234",
-				System: struct {
-					Account string `mapstructure:"account"`
-					Secret  string `mapstructure:"secret"`
-					Public  string `mapstructure:"public"`
-				}{
-					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
-					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
-					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid URL",
-			cfg: config.NetworkConfig{
-				URL: "invalid://url",
-				System: struct {
-					Account string `mapstructure:"account"`
-					Secret  string `mapstructure:"secret"`
-					Public  string `mapstructure:"public"`
-				}{
-					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
-					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
-					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty URL",
-			cfg: config.NetworkConfig{
-				URL: "",
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			blockchain, err := NewBlockchain(tt.cfg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewBlockchain() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && blockchain == nil {
-				t.Error("NewBlockchain() returned nil blockchain when no error expected")
-			}
-			if !tt.wantErr && blockchain.xrplClient == nil {
-				t.Error("NewBlockchain() returned blockchain with nil xrplClient")
-			}
-		})
-	}
-}
-
-func TestBlockchain_GetXRPLWallet(t *testing.T) {
-	// Создаем мок blockchain
-	blockchain := createMockBlockchain()
-
-	tests := []struct {
-		name        string
-		hexSeed     string
-		path        string
-		wantErr     bool
-		expectEmpty bool
-	}{
-		{
-			name:        "valid hex seed and path",
-			hexSeed:     validHexSeed,
-			path:        "44'/144'/0'/0/0",
-			wantErr:     false,
-			expectEmpty: false,
-		},
-		{
-			name:        "valid hex seed with different path",
-			hexSeed:     validHexSeed,
-			path:        "44'/144'/0'/0/1",
-			wantErr:     false,
-			expectEmpty: false,
-		},
-		{
-			name:        "invalid hex seed",
-			hexSeed:     invalidHexSeed,
-			path:        "44'/144'/0'/0/0",
-			wantErr:     true,
-			expectEmpty: true,
-		},
-		{
-			name:        "empty hex seed",
-			hexSeed:     "",
-			path:        "44'/144'/0'/0/0",
-			wantErr:     true,
-			expectEmpty: true,
-		},
-		{
-			name:        "invalid path",
-			hexSeed:     validHexSeed,
-			path:        "invalid/path",
-			wantErr:     true,
-			expectEmpty: true,
-		},
-		{
-			name:        "empty path",
-			hexSeed:     validHexSeed,
-			path:        "",
-			wantErr:     true,
-			expectEmpty: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			address, public, private, err := blockchain.GetXRPLWallet(tt.hexSeed, tt.path)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetXRPLWallet() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.expectEmpty {
-				if address != "" {
-					t.Errorf("GetXRPLWallet() address = %v, want empty string", address)
-				}
-				if public != "" {
-					t.Errorf("GetXRPLWallet() public = %v, want empty string", public)
-				}
-				if private != "" {
-					t.Errorf("GetXRPLWallet() private = %v, want empty string", private)
-				}
-			} else {
-				if address == "" {
-					t.Error("GetXRPLWallet() returned empty address when no error expected")
-				}
-				if private == "" {
-					t.Error("GetXRPLWallet() returned empty private key when no error expected")
-				}
-				// Проверяем, что адрес начинается с 'r' (XRPL адрес)
-				if len(address) > 0 && address[0] != 'r' {
-					t.Errorf("GetXRPLWallet() address = %v, should start with 'r'", address)
-				}
-			}
-		})
-	}
-}
-
-func TestBlockchain_GetAccountBalance(t *testing.T) {
-	// Создаем мок blockchain
-	blockchain := createMockBlockchain()
-
-	tests := []struct {
-		name        string
-		address     string
-		mockBalance uint64
-		mockError   error
-		wantErr     bool
-		wantBalance uint64
-	}{
-		{
-			name:        "valid address with balance",
-			address:     validAddress,
-			mockBalance: 1000000,
-			mockError:   nil,
-			wantErr:     false,
-			wantBalance: 1000000,
-		},
-		{
-			name:        "valid address with zero balance",
-			address:     validAddress,
-			mockBalance: 0,
-			mockError:   nil,
-			wantErr:     false,
-			wantBalance: 0,
-		},
-		{
-			name:        "network error",
-			address:     validAddress,
-			mockBalance: 0,
-			mockError:   fmt.Errorf("network error"),
-			wantErr:     true,
-			wantBalance: 0,
-		},
-		{
-			name:        "empty address",
-			address:     "",
-			mockBalance: 0,
-			mockError:   fmt.Errorf("invalid address"),
-			wantErr:     true,
-			wantBalance: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Настраиваем мок для этого теста
-			blockchain.accountMock.accountInfoFunc = func(req *account.AccountInfoRequest) (*account.AccountInfoResponse, interface{}, error) {
-				if tt.mockError != nil {
-					return nil, nil, tt.mockError
-				}
-				return &account.AccountInfoResponse{
-					AccountData: ledger.AccountRoot{
-						Balance: types.XRPCurrencyAmount(tt.mockBalance),
-					},
-				}, nil, nil
-			}
-
-			balance, err := blockchain.GetAccountBalance(tt.address)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetAccountBalance() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr {
-				if balance != tt.wantBalance {
-					t.Errorf("GetAccountBalance() balance = %v, want %v", balance, tt.wantBalance)
-				}
-			}
-		})
-	}
-}
-
-func TestBlockchain_GetBaseFee(t *testing.T) {
-	// Создаем мок blockchain
-	blockchain := createMockBlockchain()
-
-	tests := []struct {
-		name      string
-		mockFee   uint64
-		mockError error
-		wantErr   bool
-		wantFee   uint64
-	}{
-		{
-			name:      "valid base fee",
-			mockFee:   10000,
-			mockError: nil,
-			wantErr:   false,
-			wantFee:   10000,
-		},
-		{
-			name:      "zero base fee",
-			mockFee:   0,
-			mockError: nil,
-			wantErr:   false,
-			wantFee:   0,
-		},
-		{
-			name:      "network error",
-			mockFee:   0,
-			mockError: fmt.Errorf("network error"),
-			wantErr:   true,
-			wantFee:   0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Настраиваем мок для этого теста
-			blockchain.serverMock.feeFunc = func(req *server.FeeRequest) (*server.FeeResponse, interface{}, error) {
-				if tt.mockError != nil {
-					return nil, nil, tt.mockError
-				}
-				return &server.FeeResponse{
-					Drops: server.FeeDrops{
-						BaseFee: types.XRPCurrencyAmount(tt.mockFee),
-					},
-				}, nil, nil
-			}
-
-			fee, err := blockchain.GetBaseFee()
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetBaseFee() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr {
-				if fee != tt.wantFee {
-					t.Errorf("GetBaseFee() fee = %v, want %v", fee, tt.wantFee)
-				}
-			}
-		})
-	}
-}
-
-func TestBlockchain_SubmitTx(t *testing.T) {
-	// Создаем тестовый кошелек с корректным XRPL адресом
-	testWallet, err := crypto.NewWallet(
-		types.Address("rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"),
-		"ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
-		"ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
-	)
-	assert.NoError(t, err)
-
-	testTx := &transactions.Payment{
-		BaseTx: transactions.BaseTx{
-			TransactionType: transactions.PaymentTx,
-			Fee:             types.XRPCurrencyAmount(10000),
-			Sequence:        1,
-		},
-		Amount:      types.XRPCurrencyAmount(1000000),
-		Destination: types.Address("rJqzDMuSpE8pxztkeES3VeKGauFFRj8qDQ"),
-	}
-
-	tests := []struct {
-		name     string
-		wallet   *crypto.Wallet
-		tx       transactions.Tx
-		wantErr  bool
-		errorMsg string
-	}{
-		{
-			name:    "valid wallet and transaction",
-			wallet:  testWallet,
-			tx:      testTx,
-			wantErr: false,
-		},
-		{
-			name:     "nil wallet",
-			wallet:   nil,
-			tx:       testTx,
-			wantErr:  true,
-			errorMsg: "wallet cannot be nil",
-		},
-		{
-			name:     "nil transaction",
-			wallet:   testWallet,
-			tx:       nil,
-			wantErr:  true,
-			errorMsg: "transaction cannot be nil",
-		},
-		{
-			name:     "invalid wallet - empty address",
-			wallet:   &crypto.Wallet{Address: "", PublicKey: testWallet.PublicKey, PrivateKey: testWallet.PrivateKey},
-			tx:       testTx,
-			wantErr:  true,
-			errorMsg: "wallet is invalid: wallet address cannot be empty",
-		},
-		{
-			name:     "invalid wallet - empty public key",
-			wallet:   &crypto.Wallet{Address: testWallet.Address, PublicKey: "", PrivateKey: testWallet.PrivateKey},
-			tx:       testTx,
-			wantErr:  true,
-			errorMsg: "wallet is invalid: wallet public key cannot be empty",
-		},
-		{
-			name:     "invalid wallet - empty private key",
-			wallet:   &crypto.Wallet{Address: testWallet.Address, PublicKey: testWallet.PublicKey, PrivateKey: ""},
-			tx:       testTx,
-			wantErr:  true,
-			errorMsg: "wallet is invalid: wallet private key cannot be empty",
-		},
-		{
-			name:     "invalid wallet - malformed address",
-			wallet:   &crypto.Wallet{Address: "invalid_address", PublicKey: testWallet.PublicKey, PrivateKey: testWallet.PrivateKey},
-			tx:       testTx,
-			wantErr:  true,
-			errorMsg: "wallet is invalid: invalid xrpl address length",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Используем mock blockchain вместо реального
-			blockchain, err := NewMockBlockchain(config.NetworkConfig{
-				URL:     "mock://localhost", // Используем mock URL
-				Timeout: 30,
-				System: struct {
-					Account string `mapstructure:"account"`
-					Secret  string `mapstructure:"secret"`
-					Public  string `mapstructure:"public"`
-				}{
-					Account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC",
-					Secret:  "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51",
-					Public:  "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC",
-				},
-			})
-			assert.NoError(t, err)
-
-			// Вызываем SubmitTx
-			resp, xrplResp, err := blockchain.SubmitTx(tt.wallet, tt.tx)
-
-			// Проверяем результат
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.errorMsg != "" {
-					assert.Contains(t, err.Error(), tt.errorMsg)
-				}
-				assert.Nil(t, resp)
-				assert.Nil(t, xrplResp)
-			} else {
-				// Для успешного случая проверяем, что ошибки нет и получен mock ответ
-				assert.NoError(t, err)
-				assert.NotNil(t, resp)
-				assert.Equal(t, "tesSUCCESS", resp.EngineResult)
-				assert.Equal(t, "The transaction was applied.", resp.EngineResultMessage)
-				assert.Equal(t, "mock_tx_blob", resp.TxBlob)
-				assert.True(t, resp.Accepted)
-				assert.True(t, resp.Applied)
-				assert.True(t, resp.Broadcast)
-			}
-		})
-	}
-}
-
-// MockBlockchain - мок версия Blockchain для тестирования SubmitTx
-type MockBlockchain struct {
-	SystemWallet *crypto.Wallet
-}
-
-func NewMockBlockchain(cfg config.NetworkConfig) (*MockBlockchain, error) {
-	systemWallet, err := crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create system wallet: %w", err)
-	}
-	return &MockBlockchain{
-		SystemWallet: systemWallet,
-	}, nil
-}
-
-func (b *MockBlockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
-	resp *clienttransactions.SubmitResponse, xrplResp interface{}, err error) {
-
-	// Проверяем входные параметры
-	if w == nil {
-		return nil, nil, fmt.Errorf("wallet cannot be nil")
-	}
-	if tx == nil {
-		return nil, nil, fmt.Errorf("transaction cannot be nil")
-	}
-	if err := w.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("wallet is invalid: %w", err)
-	}
-
-	// Создаем mock ответ
-	mockResp := &clienttransactions.SubmitResponse{
-		EngineResult:        "tesSUCCESS",
-		EngineResultMessage: "The transaction was applied.",
-		TxBlob:              "mock_tx_blob",
-		Accepted:            true,
-		Applied:             true,
-		Broadcast:           true,
-	}
-
-	// Возвращаем mock ответ
-	return mockResp, nil, nil
-}
 
 func TestBlockchain_GetBaseFeeAndReserve(t *testing.T) {
-	// Создаем мок blockchain
-	blockchain := createMockBlockchain()
-
 	tests := []struct {
-		name        string
-		mockFee     float32
-		mockReserve float32
-		mockError   error
-		wantErr     bool
-		wantFee     float32
-		wantReserve float32
+		name          string
+		mockResponse  *server.ServerInfoResponse
+		mockError     error
+		expectedInfo  *server.ServerLedgerInfo
+		expectedError string
+		expectedCalls int
 	}{
 		{
-			name:        "valid fee and reserve",
-			mockFee:     0.00001,
-			mockReserve: 10.0,
-			mockError:   nil,
-			wantErr:     false,
-			wantFee:     0.00001,
-			wantReserve: 10.0,
+			name: "successful response",
+			mockResponse: &server.ServerInfoResponse{
+				Info: server.ServerInfo{
+					ValidatedLedger: &server.ServerLedgerInfo{
+						BaseFeeXRP:     0.00001,
+						ReserveBaseXRP: 10.0,
+						ReserveIncXRP:  2.0,
+					},
+				},
+			},
+			mockError: nil,
+			expectedInfo: &server.ServerLedgerInfo{
+				BaseFeeXRP:     0.00001,
+				ReserveBaseXRP: 10.0,
+				ReserveIncXRP:  2.0,
+			},
+			expectedError: "",
+			expectedCalls: 1,
 		},
 		{
-			name:        "zero fee and reserve",
-			mockFee:     0.0,
-			mockReserve: 0.0,
-			mockError:   nil,
-			wantErr:     false,
-			wantFee:     0.0,
-			wantReserve: 0.0,
+			name:          "server error",
+			mockResponse:  nil,
+			mockError:     errors.New("network error"),
+			expectedInfo:  nil,
+			expectedError: "failed to get server info: network error",
+			expectedCalls: 1,
 		},
 		{
-			name:        "network error",
-			mockFee:     0.0,
-			mockReserve: 0.0,
-			mockError:   fmt.Errorf("network error"),
-			wantErr:     true,
-			wantFee:     0.0,
-			wantReserve: 0.0,
+			name: "nil validated ledger",
+			mockResponse: &server.ServerInfoResponse{
+				Info: server.ServerInfo{
+					ValidatedLedger: nil,
+				},
+			},
+			mockError:     nil,
+			expectedInfo:  nil,
+			expectedError: "",
+			expectedCalls: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Настраиваем мок для этого теста
-			blockchain.serverMock.serverInfoFunc = func(req *server.ServerInfoRequest) (*server.ServerInfoResponse, interface{}, error) {
-				if tt.mockError != nil {
-					return nil, nil, tt.mockError
-				}
-				return &server.ServerInfoResponse{
-					Info: server.ServerInfo{
-						ValidatedLedger: &server.ServerLedgerInfo{
-							BaseFeeXRP:     tt.mockFee,
-							ReserveBaseXRP: tt.mockReserve,
-						},
-					},
-				}, nil, nil
+			// Create mock client
+			mockClient := NewMockClient()
+			mockClient.SetMockServerInfo(tt.mockResponse, tt.mockError)
+
+			// Create blockchain instance with mock client
+			blockchain := &Blockchain{
+				xrplClient: CreateMockXRPLClient(mockClient),
 			}
 
-			fee, reserve, err := blockchain.GetBaseFeeAndReserve()
+			// Call the method under test
+			result, err := blockchain.GetBaseFeeAndReserve()
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetBaseFeeAndReserve() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			// Verify call count
+			callCounts := mockClient.GetCallCounts()
+			require.Equal(t, tt.expectedCalls, callCounts["ServerInfo"], "ServerInfo should be called the expected number of times")
 
-			if !tt.wantErr {
-				if fee != tt.wantFee {
-					t.Errorf("GetBaseFeeAndReserve() fee = %v, want %v", fee, tt.wantFee)
-				}
-				if reserve != tt.wantReserve {
-					t.Errorf("GetBaseFeeAndReserve() reserve = %v, want %v", reserve, tt.wantReserve)
+			// Verify results
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				if tt.expectedInfo != nil {
+					require.NotNil(t, result)
+					assert.Equal(t, tt.expectedInfo.BaseFeeXRP, result.BaseFeeXRP)
+					assert.Equal(t, tt.expectedInfo.ReserveBaseXRP, result.ReserveBaseXRP)
+					assert.Equal(t, tt.expectedInfo.ReserveIncXRP, result.ReserveIncXRP)
+				} else {
+					require.Nil(t, result)
 				}
 			}
 		})
 	}
+}
+
+func TestBlockchain_GetBaseFeeAndReserve_Integration(t *testing.T) {
+	// Test with realistic mock data
+	mockClient := NewMockClient()
+
+	// Set up a realistic server info response
+	mockResponse := CreateMockServerInfoResponse(0.00001)
+	mockClient.SetMockServerInfo(mockResponse, nil)
+
+	blockchain := &Blockchain{
+		xrplClient: CreateMockXRPLClient(mockClient),
+	}
+
+	// Test the method
+	result, err := blockchain.GetBaseFeeAndReserve()
+
+	// Verify no error
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Verify the response contains expected data
+	assert.Equal(t, float32(0.00001), result.BaseFeeXRP)
+
+	// Verify call tracking
+	callCounts := mockClient.GetCallCounts()
+	require.Equal(t, 1, callCounts["ServerInfo"], "ServerInfo should be called once")
+
+	// Test call count reset
+	mockClient.ResetCallCounts()
+	callCounts = mockClient.GetCallCounts()
+	require.Equal(t, 0, callCounts["ServerInfo"], "Call count should be reset to zero")
 }

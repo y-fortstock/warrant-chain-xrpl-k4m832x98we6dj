@@ -39,6 +39,10 @@ func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*ac
 	l := a.logger.With("method", "Create")
 	l.Debug("start")
 	seeds := strings.Split(req.GetPassword(), "-")
+	if len(seeds) != 2 {
+		l.Error("invalid password format", "password", req.GetPassword())
+		return nil, fmt.Errorf("invalid password format: %s", req.GetPassword())
+	}
 	w, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		l.Error("failed to get XRPL address", "error", err)
@@ -106,6 +110,10 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 	l.Debug("start")
 
 	seeds := strings.Split(req.GetAccountPassword(), "-")
+	if len(seeds) != 2 {
+		l.Error("invalid password format", "password", req.GetAccountPassword())
+		return nil, fmt.Errorf("invalid password format: %s", req.GetAccountPassword())
+	}
 	w, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
 	if err != nil {
 		l.Error("failed to get XRPL address", "error", err)

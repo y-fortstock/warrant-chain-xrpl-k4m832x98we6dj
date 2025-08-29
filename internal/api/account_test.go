@@ -1,274 +1,239 @@
 package api
 
 import (
-	"strconv"
+	"context"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	accountv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/account/v1"
-	typesv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/types/v1"
 )
 
-// TestAccount_Deposit_Logic tests the deposit logic without external dependencies
-func TestAccount_Deposit_Logic(t *testing.T) {
-	// Test parsing logic
+// createTestAccount creates a test instance of Account API
+func createTestAccount() *Account {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	// Create nil blockchain since the Create method doesn't use it
+	return NewAccount(logger, nil)
+}
+
+var (
+	testHexSeed = "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
+	testAddress = "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
+)
+
+func TestAccount_Create(t *testing.T) {
+	accountAPI := createTestAccount()
+	ctx := context.Background()
+
 	tests := []struct {
 		name        string
-		weiAmount   string
-		expectError bool
-		expected    uint64
+		password    string
+		wantErr     bool
+		errorMsg    string
+		expectEmpty bool
 	}{
 		{
-			name:        "valid amount",
-			weiAmount:   "1000000",
-			expectError: false,
-			expected:    1000000,
+			name:        "valid hex seed with derivation index 0",
+			password:    testHexSeed + "-0",
+			wantErr:     false,
+			expectEmpty: false,
 		},
 		{
-			name:        "zero amount",
-			weiAmount:   "0",
-			expectError: false,
-			expected:    0,
+			name:        "valid hex seed with derivation index 1",
+			password:    testHexSeed + "-1",
+			wantErr:     false,
+			expectEmpty: false,
 		},
 		{
-			name:        "invalid amount",
-			weiAmount:   "invalid",
-			expectError: true,
-			expected:    0,
+			name:        "valid hex seed with derivation index 10",
+			password:    testHexSeed + "-10",
+			wantErr:     false,
+			expectEmpty: false,
 		},
 		{
-			name:        "negative amount string",
-			weiAmount:   "-1000000",
-			expectError: true,
-			expected:    0,
+			name:        "empty password",
+			password:    "",
+			wantErr:     true,
+			expectEmpty: true,
 		},
 		{
-			name:        "very large amount",
-			weiAmount:   "999999999999999999",
-			expectError: false,
-			expected:    999999999999999999,
+			name:        "password without dash separator",
+			password:    testHexSeed,
+			wantErr:     true,
+			expectEmpty: true,
+		},
+		{
+			name:        "password with multiple dashes",
+			password:    testHexSeed + "-0-1",
+			wantErr:     true, // Code now validates that split gives exactly 2 elements
+			expectEmpty: true,
+		},
+		{
+			name:        "invalid hex seed",
+			password:    "invalid_hex_seed-0",
+			wantErr:     true,
+			expectEmpty: true,
+		},
+		{
+			name:        "invalid derivation index - not a number",
+			password:    testHexSeed + "-abc",
+			wantErr:     true,
+			expectEmpty: true,
+		},
+		{
+			name:        "very large derivation index",
+			password:    testHexSeed + "-999999",
+			wantErr:     false,
+			expectEmpty: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := strconv.ParseUint(tt.weiAmount, 10, 64)
+			req := &accountv1.CreateRequest{
+				Password: tt.password,
+			}
 
-			if tt.expectError {
+			resp, err := accountAPI.Create(ctx, req)
+
+			if tt.wantErr {
 				assert.Error(t, err)
+				assert.Nil(t, resp)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				assert.NotNil(t, resp)
+				assert.NotNil(t, resp.Account)
+
+				if tt.expectEmpty {
+					assert.Empty(t, resp.Account.Id)
+				} else {
+					assert.NotEmpty(t, resp.Account.Id)
+					// Check that address starts with 'r' (XRPL address)
+					assert.Equal(t, uint8('r'), resp.Account.Id[0])
+					// Check that address has correct length (25-34 characters for XRPL)
+					assert.GreaterOrEqual(t, len(resp.Account.Id), 25)
+					assert.LessOrEqual(t, len(resp.Account.Id), 34)
+				}
 			}
 		})
 	}
 }
 
-// TestAccount_Deposit_RequestValidation tests request validation
-func TestAccount_Deposit_RequestValidation(t *testing.T) {
+func TestAccount_Create_EdgeCases(t *testing.T) {
+	accountAPI := createTestAccount()
+	ctx := context.Background()
+
 	tests := []struct {
-		name        string
-		accountID   string
-		weiAmount   string
-		expectValid bool
+		name     string
+		password string
+		wantErr  bool
 	}{
 		{
-			name:        "valid request",
-			accountID:   "rTestAccount123",
-			weiAmount:   "1000000",
-			expectValid: true,
+			name:     "password with leading dash",
+			password: "-" + testHexSeed + "-0",
+			wantErr:  true,
 		},
 		{
-			name:        "empty account ID",
-			accountID:   "",
-			weiAmount:   "1000000",
-			expectValid: false,
+			name:     "password with trailing dash",
+			password: testHexSeed + "-0-",
+			wantErr:  true, // Code now validates that split gives exactly 2 elements
 		},
 		{
-			name:        "empty wei amount",
-			accountID:   "rTestAccount123",
-			weiAmount:   "",
-			expectValid: false,
+			name:     "password with only dash",
+			password: "-",
+			wantErr:  true,
 		},
 		{
-			name:        "both empty",
-			accountID:   "",
-			weiAmount:   "",
-			expectValid: false,
+			name:     "password with empty hex seed",
+			password: "-0",
+			wantErr:  true,
+		},
+		{
+			name:     "password with empty derivation index",
+			password: testHexSeed + "-",
+			wantErr:  true,
+		},
+		{
+			name:     "password with spaces",
+			password: testHexSeed + " - 0",
+			wantErr:  true,
+		},
+		{
+			name:     "password with tabs",
+			password: testHexSeed + "\t-0",
+			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := &accountv1.DepositRequest{
-				AccountId: tt.accountID,
-				WeiAmount: tt.weiAmount,
+			req := &accountv1.CreateRequest{
+				Password: tt.password,
 			}
 
-			isValid := req.AccountId != "" && req.WeiAmount != ""
-			assert.Equal(t, tt.expectValid, isValid)
-		})
-	}
-}
+			resp, err := accountAPI.Create(ctx, req)
 
-// TestAccount_Deposit_ResponseStructure tests the expected response structure
-func TestAccount_Deposit_ResponseStructure(t *testing.T) {
-	// Create a mock response structure
-	resp := &accountv1.DepositResponse{
-		Transaction: &typesv1.Transaction{
-			Id:          "test-tx-hash",
-			BlockNumber: []byte{0},
-			BlockTime:   1234567890,
-		},
-	}
-
-	// Validate response structure
-	assert.NotNil(t, resp.Transaction)
-	assert.NotEmpty(t, resp.Transaction.Id)
-	assert.NotNil(t, resp.Transaction.BlockNumber)
-	assert.NotZero(t, resp.Transaction.BlockTime)
-}
-
-// TestAccount_Create_Logic tests the create account logic
-func TestAccount_Create_Logic(t *testing.T) {
-	tests := []struct {
-		name        string
-		password    string
-		expectValid bool
-	}{
-		{
-			name:        "valid password",
-			password:    "test-password",
-			expectValid: true,
-		},
-		{
-			name:        "empty password",
-			password:    "",
-			expectValid: false,
-		},
-		{
-			name:        "password with dash",
-			password:    "test-password-with-dash",
-			expectValid: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := &accountv1.CreateRequest{Password: tt.password}
-
-			isValid := req.Password != ""
-			assert.Equal(t, tt.expectValid, isValid)
-		})
-	}
-}
-
-// TestAccount_GetBalance_Logic tests the get balance logic
-func TestAccount_GetBalance_Logic(t *testing.T) {
-	tests := []struct {
-		name        string
-		accountID   string
-		expectValid bool
-	}{
-		{
-			name:        "valid account ID",
-			accountID:   "rTestAccount123",
-			expectValid: true,
-		},
-		{
-			name:        "empty account ID",
-			accountID:   "",
-			expectValid: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := &accountv1.GetBalanceRequest{AccountId: tt.accountID}
-
-			isValid := req.AccountId != ""
-			assert.Equal(t, tt.expectValid, isValid)
-		})
-	}
-}
-
-// TestAccount_ClearBalance_Logic tests the clear balance logic
-func TestAccount_ClearBalance_Logic(t *testing.T) {
-	tests := []struct {
-		name        string
-		accountID   string
-		password    string
-		expectValid bool
-	}{
-		{
-			name:        "valid request",
-			accountID:   "rTestAccount123",
-			password:    "test-password",
-			expectValid: true,
-		},
-		{
-			name:        "empty account ID",
-			accountID:   "",
-			password:    "test-password",
-			expectValid: false,
-		},
-		{
-			name:        "empty password",
-			accountID:   "rTestAccount123",
-			password:    "",
-			expectValid: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := &accountv1.ClearBalanceRequest{
-				AccountId:       tt.accountID,
-				AccountPassword: tt.password,
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, resp)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, resp)
 			}
-
-			isValid := req.AccountId != "" && req.AccountPassword != ""
-			assert.Equal(t, tt.expectValid, isValid)
 		})
 	}
 }
 
-// Benchmark tests for performance
-func BenchmarkParseUint(b *testing.B) {
-	weiAmount := "1000000"
+func TestAccount_Create_Consistency(t *testing.T) {
+	accountAPI := createTestAccount()
+	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := strconv.ParseUint(weiAmount, 10, 64)
-		if err != nil {
-			b.Fatal(err)
+	// Test consistency: the same password should always give the same address
+	password := testHexSeed + "-0"
+	req := &accountv1.CreateRequest{
+		Password: password,
+	}
+
+	resp1, err1 := accountAPI.Create(ctx, req)
+	assert.NoError(t, err1)
+	assert.NotNil(t, resp1)
+
+	resp2, err2 := accountAPI.Create(ctx, req)
+	assert.NoError(t, err2)
+	assert.NotNil(t, resp2)
+
+	// Addresses should be the same
+	assert.Equal(t, resp1.Account.Id, resp2.Account.Id)
+}
+
+func TestAccount_Create_DifferentDerivationPaths(t *testing.T) {
+	accountAPI := createTestAccount()
+	ctx := context.Background()
+
+	// Test that different derivation indices give different addresses
+	indices := []string{"0", "1", "2", "10", "100"}
+	addresses := make(map[string]bool)
+
+	for _, index := range indices {
+		password := testHexSeed + "-" + index
+		req := &accountv1.CreateRequest{
+			Password: password,
 		}
-	}
-}
 
-func BenchmarkCreateRequest(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req := &accountv1.CreateRequest{Password: "test-password"}
-		_ = req
-	}
-}
+		resp, err := accountAPI.Create(ctx, req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotEmpty(t, resp.Account.Id)
 
-func BenchmarkDepositRequest(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req := &accountv1.DepositRequest{
-			AccountId: "rTestAccount123",
-			WeiAmount: "1000000",
-		}
-		_ = req
-	}
-}
+		// Check that address is unique
+		assert.False(t, addresses[resp.Account.Id], "Duplicate address for index %s: %s", index, resp.Account.Id)
+		addresses[resp.Account.Id] = true
 
-func BenchmarkGetBalanceRequest(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req := &accountv1.GetBalanceRequest{AccountId: "rTestAccount123"}
-		_ = req
+		// Check that address starts with 'r'
+		assert.Equal(t, uint8('r'), resp.Account.Id[0])
 	}
+
+	// Check that all addresses are different
+	assert.Equal(t, len(indices), len(addresses))
 }
