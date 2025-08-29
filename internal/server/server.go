@@ -138,12 +138,10 @@ func (s *Server) RunWithGracefulShutdown(ctx context.Context, addr string) error
 
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Серверная горутина
 	g.Go(func() error {
 		return s.grpcServer.Serve(lis)
 	})
 
-	// Горутина для graceful shutdown по сигналу или отмене контекста
 	g.Go(func() error {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
