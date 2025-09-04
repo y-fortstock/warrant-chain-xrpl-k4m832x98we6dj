@@ -411,15 +411,19 @@ func (m MPToken) CreateIssuanceID(issuer string, sequence uint32) (string, error
 	return fmt.Sprintf("%08X%s", sequence, accountIDHex), nil
 }
 
-// Account already preconfigured to hold RLUSD
+// Accounts already preconfigured to hold RLUSD
 const (
-	IssuerAddress   = "rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8"
-	IssuerSeed      = "sEdTHw4jqyZjwFz6wvnFLbYtQU2rXpn"
+	// RLUSD Issuer https://dev.bithomp.com/explorer/rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8
+	IssuerAddress = "rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8"
+	IssuerSeed    = "sEdTHw4jqyZjwFz6wvnFLbYtQU2rXpn"
+	// RLUSD Borrower https://dev.bithomp.com/explorer/rNDsqJmMmTVHAsnpYYGo8dhdA8zNNMdheX
 	BorrowerAddress = "rNDsqJmMmTVHAsnpYYGo8dhdA8zNNMdheX"
 	BorrowerSeed    = "sEd7gV77TKkP6DT6vhkCK9RPNMfqGde"
-	LenderAddress   = "rN84PRqxczDeno1a4JaXKwNqTYEG1dcXzh"
-	LenderSeed      = "sEdSdV9aTSngqQEDMDkEqgpExqkJdkW"
-	RLUSDHex        = "524C555344000000000000000000000000000000"
+	// RLUSD Lender https://dev.bithomp.com/explorer/rN84PRqxczDeno1a4JaXKwNqTYEG1dcXzh
+	LenderAddress = "rN84PRqxczDeno1a4JaXKwNqTYEG1dcXzh"
+	LenderSeed    = "sEdSdV9aTSngqQEDMDkEqgpExqkJdkW"
+	// RLUSD Hex format for issued currency amount
+	RLUSDHex = "524C555344000000000000000000000000000000"
 )
 
 // Loan Flow
@@ -436,9 +440,8 @@ func GetLenderWallet() (wallet.Wallet, error) {
 	return wallet.FromSeed(LenderSeed, "")
 }
 
-func (b *Blockchain) Deployment(w *wallet.Wallet, warrantMptIssuanceID string) (nil, err error) {
+func (b *Blockchain) Deployment(w *wallet.Wallet, warrantMptIssuanceID string, mpt MPToken) (nil, err error) {
 	// Get borrower and lender wallets
-
 	borrower, err := GetBorrowerWallet()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get borrower wallet: %w", err)
@@ -450,10 +453,7 @@ func (b *Blockchain) Deployment(w *wallet.Wallet, warrantMptIssuanceID string) (
 	}
 
 	// Borrower mints MPT
-	_, issuanceID, err := b.MPTokenIssuanceCreate(&borrower, MPToken{
-		DocumentHash: "1",
-		Signature:    "1",
-	})
+	_, issuanceID, err := b.MPTokenIssuanceCreate(&borrower, mpt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mint borrower MPT: %w", err)
 	}
