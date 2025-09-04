@@ -410,3 +410,99 @@ func (m MPToken) CreateIssuanceID(issuer string, sequence uint32) (string, error
 	accountIDHex := fmt.Sprintf("%X", accountID)
 	return fmt.Sprintf("%08X%s", sequence, accountIDHex), nil
 }
+
+// Account already preconfigured to hold RLUSD
+const (
+	IssuerAddress   = "rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8"
+	IssuerSeed      = "sEdTHw4jqyZjwFz6wvnFLbYtQU2rXpn"
+	BorrowerAddress = "rNDsqJmMmTVHAsnpYYGo8dhdA8zNNMdheX"
+	BorrowerSeed    = "sEd7gV77TKkP6DT6vhkCK9RPNMfqGde"
+	LenderAddress   = "rN84PRqxczDeno1a4JaXKwNqTYEG1dcXzh"
+	LenderSeed      = "sEdSdV9aTSngqQEDMDkEqgpExqkJdkW"
+	RLUSDHex        = "524C555344000000000000000000000000000000"
+)
+
+// Loan Flow
+
+func GetIssuerWallet() (wallet.Wallet, error) {
+	return wallet.FromSeed(IssuerSeed, "")
+}
+
+func GetBorrowerWallet() (wallet.Wallet, error) {
+	return wallet.FromSeed(BorrowerSeed, "")
+}
+
+func GetLenderWallet() (wallet.Wallet, error) {
+	return wallet.FromSeed(LenderSeed, "")
+}
+
+func (b *Blockchain) Deployment(w *wallet.Wallet, warrantMptIssuanceID string) (nil, err error) {
+	// Get borrower and lender wallets
+
+	borrower, err := GetBorrowerWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get borrower wallet: %w", err)
+	}
+
+	lender, err := GetLenderWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lender wallet: %w", err)
+	}
+
+	// Borrower mints MPT
+	_, issuanceID, err := b.MPTokenIssuanceCreate(&borrower, MPToken{
+		DocumentHash: "1",
+		Signature:    "1",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to mint borrower MPT: %w", err)
+	}
+
+	// Lender authorizes MPT
+	_, err = b.AuthorizeMPToken(&lender, issuanceID)
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to authorize borrower MPT: %w", err)
+	}
+
+	// Borrower transfers MPT to lender
+	_, err = b.TransferMPToken(&borrower, issuanceID, lender.ClassicAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to transfer borrower MPT to lender: %w", err)
+	}
+
+	// Lender authorizes Warrant MPT
+	_, err = b.AuthorizeMPToken(&lender, warrantMptIssuanceID)
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to authorize warrant MPT: %w", err)
+	}
+
+	// Borrower transfers Warrant MPT to lender
+	_, err = b.TransferMPToken(&borrower, warrantMptIssuanceID, lender.ClassicAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("borrower failed to transfer warrant MPT to lender: %w", err)
+	}
+
+	// Lender distribues 1000000 RLUSD to borrower
+	payment := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			Account: lender.ClassicAddress,
+		},
+		Amount: types.IssuedCurrencyAmount{
+			Issuer:   IssuerAddress,
+			Currency: RLUSDHex,
+			Value:    "1000000",
+		},
+		Destination: borrower.ClassicAddress,
+	}
+	paymentTx, err := b.c.SubmitTxAndWait(payment.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &lender,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to distribute RLUSD to borrower: %w", err)
+	}
+	fmt.Printf("#️⃣ RLUSD Payment Hash: %+v\n", paymentTx.Hash)
+
+	return nil, nil
+}
