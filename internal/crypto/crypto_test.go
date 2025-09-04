@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	ac "github.com/CreatureDev/xrpl-go/address-codec"
-	"github.com/CreatureDev/xrpl-go/keypairs"
+	ac "github.com/Peersyst/xrpl-go/address-codec"
+	"github.com/Peersyst/xrpl-go/keypairs"
+	"github.com/Peersyst/xrpl-go/xrpl/transaction/types"
 	"github.com/decen-one/go-bip39"
 	"github.com/stretchr/testify/assert"
 )
@@ -178,7 +179,10 @@ func TestFullDerivationFlow(t *testing.T) {
 
 	// Генерируем адрес из публичного ключа
 	accountID := ac.Sha256RipeMD160(pubKeyBytes)
-	generatedAddress := ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+	generatedAddress, err := ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+	if err != nil {
+		t.Fatalf("Failed to encode address: %v", err)
+	}
 
 	// Адрес должен совпадать с полученным из кошелька
 	assert.Equal(t, walletAddress, generatedAddress)
@@ -200,4 +204,169 @@ func TestInvalidInputs(t *testing.T) {
 	// Тест с пустым hex seed
 	_, err = GetExtendedKeyFromHexSeedWithPath("", derivationPath)
 	assert.Error(t, err)
+}
+
+func TestNewWalletFromExtendedKey(t *testing.T) {
+	t.Run("valid extended key", func(t *testing.T) {
+		// Create a valid extended key first
+		key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
+		assert.NoError(t, err)
+		assert.NotNil(t, key)
+
+		// Test creating wallet from extended key
+		wallet, err := NewWalletFromExtendedKey(key)
+		assert.NoError(t, err)
+		assert.NotNil(t, wallet)
+
+		// Verify wallet fields are populated
+		assert.NotEmpty(t, wallet.ClassicAddress)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
+
+		// Verify address format (XRPL addresses start with 'r')
+		assert.Equal(t, uint8('r'), wallet.ClassicAddress[0])
+
+		// Verify public key is hex string
+		assert.Greater(t, len(wallet.PublicKey), 0)
+		assert.Greater(t, len(wallet.PrivateKey), 0)
+	})
+
+	t.Run("nil extended key", func(t *testing.T) {
+		wallet, err := NewWalletFromExtendedKey(nil)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+}
+
+func TestNewWalletFromHexSeed(t *testing.T) {
+	t.Run("valid hex seed and path", func(t *testing.T) {
+		wallet, err := NewWalletFromHexSeed(hexSeed, derivationPath)
+		assert.NoError(t, err)
+		assert.NotNil(t, wallet)
+
+		// Verify wallet fields are populated
+		assert.NotEmpty(t, wallet.ClassicAddress)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
+
+		// Verify address format
+		assert.Equal(t, uint8('r'), wallet.ClassicAddress[0])
+
+		// Verify the address matches expected
+		assert.Equal(t, types.Address(address), wallet.ClassicAddress)
+	})
+
+	t.Run("invalid hex seed", func(t *testing.T) {
+		wallet, err := NewWalletFromHexSeed("invalid_hex", derivationPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+
+	t.Run("empty hex seed", func(t *testing.T) {
+		wallet, err := NewWalletFromHexSeed("", derivationPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+
+	t.Run("invalid derivation path", func(t *testing.T) {
+		wallet, err := NewWalletFromHexSeed(hexSeed, "invalid/path")
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+
+	t.Run("empty derivation path", func(t *testing.T) {
+		wallet, err := NewWalletFromHexSeed(hexSeed, "")
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+}
+
+func TestWalletIntegration(t *testing.T) {
+	t.Run("full wallet creation flow", func(t *testing.T) {
+		// Test the complete flow from hex seed to wallet
+		wallet, err := NewWalletFromHexSeed(hexSeed, derivationPath)
+		assert.NoError(t, err)
+		assert.NotNil(t, wallet)
+
+		// Verify all wallet components
+		assert.Equal(t, types.Address(address), wallet.ClassicAddress)
+		assert.NotEmpty(t, wallet.PublicKey)
+		assert.NotEmpty(t, wallet.PrivateKey)
+
+		// Verify wallet can be recreated with same data
+		recreatedWallet, err := NewWallet(wallet.ClassicAddress, wallet.PublicKey, wallet.PrivateKey)
+		assert.NoError(t, err)
+		assert.Equal(t, wallet.ClassicAddress, recreatedWallet.ClassicAddress)
+		assert.Equal(t, wallet.PublicKey, recreatedWallet.PublicKey)
+		assert.Equal(t, wallet.PrivateKey, recreatedWallet.PrivateKey)
+	})
+
+	t.Run("wallet consistency", func(t *testing.T) {
+		// Create wallet using hex seed method
+		wallet1, err := NewWalletFromHexSeed(hexSeed, derivationPath)
+		assert.NoError(t, err)
+
+		// Create wallet using extended key method
+		key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, derivationPath)
+		assert.NoError(t, err)
+		wallet2, err := NewWalletFromExtendedKey(key)
+		assert.NoError(t, err)
+
+		// Both wallets should be identical
+		assert.Equal(t, wallet1.ClassicAddress, wallet2.ClassicAddress)
+		assert.Equal(t, wallet1.PublicKey, wallet2.PublicKey)
+		assert.Equal(t, wallet1.PrivateKey, wallet2.PrivateKey)
+	})
+}
+
+func TestWalletEdgeCases(t *testing.T) {
+	t.Run("very long hex seed", func(t *testing.T) {
+		longSeed := "434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f" +
+			"434670347c6bb7c791e3629fc79c38307315d625fc5b448a601abda6ba54f7efd0cfe70bf769f7e3545c970851f6fe9132ad658101ed1ff9cb2edfeb5dd2d19f"
+
+		wallet, err := NewWalletFromHexSeed(longSeed, derivationPath)
+		// This should either succeed or fail gracefully, but not panic
+		if err != nil {
+			assert.Nil(t, wallet)
+			// Log the error for debugging but don't fail the test
+			t.Logf("Expected error for long seed: %v", err)
+		} else {
+			assert.NotNil(t, wallet)
+			// Verify the wallet has valid data
+			assert.NotEmpty(t, wallet.ClassicAddress)
+			assert.NotEmpty(t, wallet.PublicKey)
+			assert.NotEmpty(t, wallet.PrivateKey)
+		}
+	})
+
+	t.Run("complex derivation path", func(t *testing.T) {
+		complexPath := "m/44'/144'/0'/0'/1'/2'/3'/4'/5'/6'"
+		wallet, err := NewWalletFromHexSeed(hexSeed, complexPath)
+		// This should either succeed or fail gracefully, but not panic
+		if err != nil {
+			assert.Nil(t, wallet)
+			// Log the error for debugging but don't fail the test
+			t.Logf("Expected error for complex path: %v", err)
+		} else {
+			assert.NotNil(t, wallet)
+			// Verify the wallet has valid data
+			assert.NotEmpty(t, wallet.ClassicAddress)
+			assert.NotEmpty(t, wallet.PublicKey)
+			assert.NotEmpty(t, wallet.PrivateKey)
+		}
+	})
+
+	t.Run("malformed hex seed", func(t *testing.T) {
+		malformedSeed := "not_a_hex_string"
+		wallet, err := NewWalletFromHexSeed(malformedSeed, derivationPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
+
+	t.Run("invalid derivation path format", func(t *testing.T) {
+		invalidPath := "invalid/path/format"
+		wallet, err := NewWalletFromHexSeed(hexSeed, invalidPath)
+		assert.Error(t, err)
+		assert.Nil(t, wallet)
+	})
 }
