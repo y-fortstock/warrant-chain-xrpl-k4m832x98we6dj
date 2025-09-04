@@ -3,24 +3,23 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
-	addresscodec "github.com/CreatureDev/xrpl-go/address-codec"
-	binarycodec "github.com/CreatureDev/xrpl-go/binary-codec"
-	"github.com/CreatureDev/xrpl-go/client"
-	jsonrpcclient "github.com/CreatureDev/xrpl-go/client/jsonrpc"
-	"github.com/CreatureDev/xrpl-go/keypairs"
-	"github.com/CreatureDev/xrpl-go/model/client/account"
-	clientcommon "github.com/CreatureDev/xrpl-go/model/client/common"
-	"github.com/CreatureDev/xrpl-go/model/client/server"
-	clienttransactions "github.com/CreatureDev/xrpl-go/model/client/transactions"
-	"github.com/CreatureDev/xrpl-go/model/ledger"
-	"github.com/CreatureDev/xrpl-go/model/transactions"
-	"github.com/CreatureDev/xrpl-go/model/transactions/types"
+	addresscodec "github.com/Peersyst/xrpl-go/address-codec"
+	account "github.com/Peersyst/xrpl-go/xrpl/queries/account"
+	"github.com/Peersyst/xrpl-go/xrpl/queries/common"
+	"github.com/Peersyst/xrpl-go/xrpl/queries/server"
+	servertypes "github.com/Peersyst/xrpl-go/xrpl/queries/server/types"
+	requests "github.com/Peersyst/xrpl-go/xrpl/queries/transactions"
+	"github.com/Peersyst/xrpl-go/xrpl/rpc"
+	rpctypes "github.com/Peersyst/xrpl-go/xrpl/rpc/types"
+	transactions "github.com/Peersyst/xrpl-go/xrpl/transaction"
+	"github.com/Peersyst/xrpl-go/xrpl/transaction/types"
+	"github.com/Peersyst/xrpl-go/xrpl/wallet"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/config"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 )
@@ -31,12 +30,17 @@ const (
 	xrpToDrops = 1000000
 )
 
+type SubmittableTransaction interface {
+	TxType() transactions.TxType
+	Flatten() transactions.FlatTransaction
+}
+
 // Blockchain represents the main interface to the XRPL blockchain.
 // It provides methods for interacting with the XRPL network, including
 // account operations, transaction submission, and token management.
 type Blockchain struct {
-	xrplClient   *client.XRPLClient
-	SystemWallet *crypto.Wallet
+	c *rpc.Client
+	w *wallet.Wallet
 }
 
 // NewBlockchain creates and returns a new Blockchain instance.
@@ -47,21 +51,22 @@ type Blockchain struct {
 //
 // Returns a configured Blockchain instance or an error if initialization fails.
 func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
-	rpcCfg, err := client.NewJsonRpcConfig(cfg.URL, client.WithHttpClient(&http.Client{
+	rpcCfg, err := rpc.NewClientConfig(cfg.URL, rpc.WithHTTPClient(&http.Client{
 		Timeout: time.Duration(cfg.Timeout) * time.Second,
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JSON-RPC config for %s: %w", cfg.URL, err)
 	}
-	client := jsonrpcclient.NewClient(rpcCfg)
+	client := rpc.NewClient(rpcCfg)
 
-	systemWallet, err := crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret)
+	w, err := crypto.NewWallet(types.Address(cfg.System.Account), cfg.System.Public, cfg.System.Secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create system wallet: %w", err)
+		return nil, fmt.Errorf("failed to create wallet: %w", err)
 	}
+
 	return &Blockchain{
-		xrplClient:   client,
-		SystemWallet: systemWallet,
+		c: client,
+		w: w,
 	}, nil
 }
 
@@ -69,10 +74,10 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 // This information is used to calculate transaction costs and minimum account balances.
 //
 // Returns server ledger information including base fee and reserve amounts, or an error if the request fails.
-func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err error) {
-	resp, _, err := b.xrplClient.Server.ServerInfo(&server.ServerInfoRequest{})
+func (b *Blockchain) GetBaseFeeAndReserve() (info servertypes.ClosedLedger, err error) {
+	resp, err := b.c.GetServerInfo(&server.InfoRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get server info: %w", err)
+		return servertypes.ClosedLedger{}, fmt.Errorf("failed to get server info: %w", err)
 	}
 
 	return resp.Info.ValidatedLedger, nil
@@ -86,48 +91,39 @@ func (b *Blockchain) GetBaseFeeAndReserve() (info *server.ServerLedgerInfo, err 
 // - tx: The transaction to submit
 //
 // Returns the submit response, XRPL response, and any error that occurred during submission.
-func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
-	resp *clienttransactions.SubmitResponse, xrplResp client.XRPLResponse, err error) {
+func (b *Blockchain) SubmitTx(w *wallet.Wallet, tx SubmittableTransaction) (
+	hash string, err error) {
 	if w == nil {
-		return nil, nil, fmt.Errorf("wallet cannot be nil")
+		return "", fmt.Errorf("wallet cannot be nil")
 	}
 	if tx == nil {
-		return nil, nil, fmt.Errorf("transaction cannot be nil")
-	}
-	if err := w.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("wallet is invalid: %w", err)
+		return "", fmt.Errorf("transaction cannot be nil")
 	}
 
-	if err := b.xrplClient.AutofillTx(w.Address, tx); err != nil {
-		return nil, nil, fmt.Errorf("failed to autofill tx: %w", err)
-	}
+	// Access BaseTx fields directly since all transaction types embed BaseTx
+	flattenedTx := tx.Flatten()
+	flattenedTx["Account"] = w.ClassicAddress.String()
+	flattenedTx["SigningPubKey"] = w.PublicKey
 
-	baseTx := transactions.BaseTxForTransaction(tx)
-	if baseTx == nil {
-		return nil, nil, fmt.Errorf("failed to get base transaction")
-	}
-	baseTx.Account = w.Address
-	baseTx.SigningPubKey = w.PublicKey
-
-	encodedForSigning, err := binarycodec.EncodeForSigning(tx)
+	resp, err := b.c.SubmitTx(flattenedTx, &rpctypes.SubmitOptions{
+		Autofill: true,
+		FailHard: false,
+		Wallet:   w,
+	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encode for signing: %w", err)
-	}
-	signature, err := keypairs.Sign(encodedForSigning, w.PrivateKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign: %w", err)
-	}
-	baseTx.TxnSignature = signature
-
-	txBlob, err := binarycodec.Encode(tx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encode: %w", err)
+		return "", fmt.Errorf("failed to submit tx: %w", err)
 	}
 
-	submitReq := &clienttransactions.SubmitRequest{
-		TxBlob: txBlob,
+	if resp.EngineResult != string(transactions.TesSUCCESS) {
+		return "", &rpc.ClientError{ErrorString: "transaction failed to submit with engine result: " + resp.EngineResult}
 	}
-	return b.xrplClient.Transaction.Submit(submitReq)
+
+	hash = resp.Tx["hash"].(string)
+	if hash == "" {
+		return "", fmt.Errorf("hash is empty")
+	}
+
+	return hash, nil
 }
 
 // GetAccountInfo retrieves detailed information about an XRPL account.
@@ -137,12 +133,12 @@ func (b *Blockchain) SubmitTx(w *crypto.Wallet, tx transactions.Tx) (
 // - address: The XRPL account address to query
 //
 // Returns account information or an error if the request fails.
-func (b *Blockchain) GetAccountInfo(address string) (*account.AccountInfoResponse, error) {
-	accountInfoReq := &account.AccountInfoRequest{
+func (b *Blockchain) GetAccountInfo(address string) (*account.InfoResponse, error) {
+	accountInfoReq := &account.InfoRequest{
 		Account:     types.Address(address),
-		LedgerIndex: clientcommon.VALIDATED,
+		LedgerIndex: common.Validated,
 	}
-	accountInfo, _, err := b.xrplClient.Account.AccountInfo(accountInfoReq)
+	accountInfo, err := b.c.GetAccountInfo(accountInfoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
@@ -157,33 +153,47 @@ func (b *Blockchain) GetAccountInfo(address string) (*account.AccountInfoRespons
 //
 // Returns transaction response, metadata, base transaction, and any error that occurred.
 func (b *Blockchain) GetTransactionInfo(hash string) (
-	resp *clienttransactions.TxResponse,
+	resp *requests.TxResponse,
 	meta transactions.TxObjMeta,
 	baseTx *transactions.BaseTx,
 	err error) {
-	resp, _, err = b.xrplClient.Transaction.Tx(&clienttransactions.TxRequest{
+	res, err := b.c.Request(&requests.TxRequest{
 		Transaction: hash,
 	})
 	if err != nil {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to get transaction info: %w", err)
 	}
 
-	if resp.Meta == nil {
+	var txResp requests.TxResponse
+	err = res.GetResult(&txResp)
+	if err != nil {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse transaction response: %w", err)
+	}
+
+	if txResp.Meta == nil {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("metadata is nil")
 	}
-	if resp.Tx == nil {
+	if txResp.Tx == nil {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction is nil")
 	}
 
-	if objMeta, ok := resp.Meta.(transactions.TxObjMeta); ok {
+	if objMeta, ok := txResp.Meta.(transactions.TxObjMeta); ok {
 		meta = objMeta
+	} else {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to cast metadata to TxObjMeta")
 	}
-	baseTx = transactions.BaseTxForTransaction(resp.Tx)
-	if baseTx == nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract base transaction from transaction")
+	baseTx = &transactions.BaseTx{
+		Account:            txResp.Tx["Account"].(types.Address),
+		Fee:                txResp.Tx["Fee"].(types.XRPCurrencyAmount),
+		Flags:              txResp.Tx["Flags"].(uint32),
+		LastLedgerSequence: txResp.Tx["LastLedgerSequence"].(uint32),
+		Sequence:           txResp.Tx["Sequence"].(uint32),
+		SigningPubKey:      txResp.Tx["SigningPubKey"].(string),
+		TransactionType:    transactions.TxType(txResp.Tx["TransactionType"].(string)),
+		TxnSignature:       txResp.Tx["TxnSignature"].(string),
 	}
 
-	return resp, meta, baseTx, nil
+	return &txResp, meta, baseTx, nil
 }
 
 // PaymentFromSystemAccount transfers XRP from the system account to the specified destination.
@@ -195,7 +205,7 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 //
 // Returns the transaction hash if successful, or an error if the transfer fails.
 func (b *Blockchain) PaymentFromSystemAccount(to string, amount uint64) (hash string, err error) {
-	return b.Payment(b.SystemWallet, types.Address(to), amount)
+	return b.Payment(b.w, types.Address(to), amount)
 }
 
 // PaymentToSystemAccount transfers XRP from the specified source wallet to the system account.
@@ -206,8 +216,8 @@ func (b *Blockchain) PaymentFromSystemAccount(to string, amount uint64) (hash st
 // - amount: The amount to transfer in drops
 //
 // Returns the transaction hash if successful, or an error if the transfer fails.
-func (b *Blockchain) PaymentToSystemAccount(from *crypto.Wallet, amount uint64) (hash string, err error) {
-	return b.Payment(from, b.SystemWallet.Address, amount)
+func (b *Blockchain) PaymentToSystemAccount(from *wallet.Wallet, amount uint64) (hash string, err error) {
+	return b.Payment(from, b.w.ClassicAddress, amount)
 }
 
 // Payment executes a payment transaction between two accounts.
@@ -219,29 +229,13 @@ func (b *Blockchain) PaymentToSystemAccount(from *crypto.Wallet, amount uint64) 
 // - amount: The amount to transfer in drops
 //
 // Returns the transaction hash if successful, or an error if the payment fails.
-func (b *Blockchain) Payment(from *crypto.Wallet, to types.Address, amount uint64) (hash string, err error) {
+func (b *Blockchain) Payment(from *wallet.Wallet, to types.Address, amount uint64) (txHash string, err error) {
 	payment := &transactions.Payment{
 		Amount:      types.XRPCurrencyAmount(amount),
 		Destination: to,
 	}
 
-	resp, _, err := b.SubmitTx(from, payment)
-	if err != nil {
-		return "", fmt.Errorf("failed to submit: %w", err)
-	}
-	if !strings.Contains(resp.EngineResult, "SUCCESS") {
-		return "", fmt.Errorf("failed to submit: %s, %d, %s",
-			resp.EngineResult,
-			resp.EngineResultCode,
-			resp.EngineResultMessage)
-	}
-
-	baseTx, err := b.getBaseTx(resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to get base transaction")
-	}
-
-	return string(baseTx.Hash), nil
+	return b.SubmitTx(from, payment)
 }
 
 // MPTokenIssuanceCreate creates a new Multi-Purpose Token (MPT) on the XRPL network.
@@ -252,7 +246,7 @@ func (b *Blockchain) Payment(from *crypto.Wallet, to types.Address, amount uint6
 // - mpt: The MPToken containing document hash and signature information
 //
 // Returns the transaction hash and issuance ID if successful, or an error if creation fails.
-func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash, issuanceID string, err error) {
+func (b *Blockchain) MPTokenIssuanceCreate(w *wallet.Wallet, mpt MPToken) (txHash, issuanceID string, err error) {
 	md, err := mpt.CreateMetadata()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create metadata: %w", err)
@@ -263,35 +257,27 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash,
 		return "", "", fmt.Errorf("failed to get blob: %w", err)
 	}
 
+	maxAmount := types.XRPCurrencyAmount(1)
 	tx := &transactions.MPTokenIssuanceCreate{
-		MPTokenMetadata: blob,
-		MaximumAmount:   "1",
-		TransferFee:     0,
-		Flags:           types.NewFlag().SetFlag(types.TfMPTCanEscrow).SetFlag(types.TfMPTCanTrade).SetFlag(types.TfMPTCanTransfer),
+		MPTokenMetadata: &blob,
+		MaximumAmount:   &maxAmount,
+		TransferFee:     types.TransferFee(0),
 	}
+	tx.SetMPTCanEscrowFlag()
+	tx.SetMPTCanTradeFlag()
+	tx.SetMPTCanTransferFlag()
 
-	resp, _, err := b.SubmitTx(w, tx)
+	hash, err := b.SubmitTx(w, tx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to submit tx: %w", err)
 	}
-	if !strings.Contains(resp.EngineResult, "SUCCESS") {
-		return "", "", fmt.Errorf("failed to submit: %s, %d, %s",
-			resp.EngineResult,
-			resp.EngineResultCode,
-			resp.EngineResultMessage)
-	}
 
-	issuanceID, err = mpt.CreateIssuanceID(string(w.Address), tx.Sequence)
+	issuanceID, err = mpt.CreateIssuanceID(string(w.ClassicAddress), tx.Sequence)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
 	}
 
-	baseTx, err := b.getBaseTx(resp)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get base transaction: %w", err)
-	}
-
-	return string(baseTx.Hash), issuanceID, nil
+	return hash, issuanceID, nil
 }
 
 // AuthorizeMPToken authorizes an MPT for use by the specified wallet.
@@ -302,31 +288,12 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *crypto.Wallet, mpt MPToken) (hash,
 // - issuanceId: The ID of the token issuance to authorize
 //
 // Returns the transaction hash if successful, or an error if authorization fails.
-func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash string, err error) {
+func (b *Blockchain) AuthorizeMPToken(w *wallet.Wallet, issuanceId string) (txHash string, err error) {
 	tx := &transactions.MPTokenAuthorize{
-		MPTokenIssuanceID: types.Hash192(issuanceId),
+		MPTokenIssuanceID: issuanceId,
 	}
 
-	resp, _, err := b.SubmitTx(w, tx)
-	if err != nil {
-		return "", fmt.Errorf("failed to submit tx: %w", err)
-	}
-	// TODO: remove this
-	fmt.Println("resp", resp)
-
-	if !strings.Contains(resp.EngineResult, "SUCCESS") {
-		return "", fmt.Errorf("failed to submit: %s, %d, %s",
-			resp.EngineResult,
-			resp.EngineResultCode,
-			resp.EngineResultMessage)
-	}
-
-	baseTx, err := b.getBaseTx(resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to get base transaction: %w", err)
-	}
-
-	return string(baseTx.Hash), nil
+	return b.SubmitTx(w, tx)
 }
 
 // TransferMPToken transfers an MPT from one account to another.
@@ -338,32 +305,16 @@ func (b *Blockchain) AuthorizeMPToken(w *crypto.Wallet, issuanceId string) (hash
 // - to: The destination account address
 //
 // Returns the transaction hash if successful, or an error if the transfer fails.
-func (b *Blockchain) TransferMPToken(w *crypto.Wallet, issuanceId, to string) (hash string, err error) {
+func (b *Blockchain) TransferMPToken(w *wallet.Wallet, issuanceId, to string) (txHash string, err error) {
 	tx := &transactions.Payment{
 		Amount: types.MPTCurrencyAmount{
 			Value:         "1",
-			MPTIssuanceID: types.Hash192(issuanceId),
+			MPTIssuanceID: issuanceId,
 		},
 		Destination: types.Address(to),
 	}
 
-	resp, _, err := b.SubmitTx(w, tx)
-	if err != nil {
-		return "", fmt.Errorf("failed to submit tx: %w", err)
-	}
-	if !strings.Contains(resp.EngineResult, "SUCCESS") {
-		return "", fmt.Errorf("failed to submit: %s, %d, %s",
-			resp.EngineResult,
-			resp.EngineResultCode,
-			resp.EngineResultMessage)
-	}
-
-	baseTx, err := b.getBaseTx(resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to get base transaction: %w", err)
-	}
-
-	return string(baseTx.Hash), nil
+	return b.SubmitTx(w, tx)
 }
 
 // GetIssuerAddressFromIssuanceID extracts the issuer's address from a token issuance ID.
@@ -374,49 +325,22 @@ func (b *Blockchain) TransferMPToken(w *crypto.Wallet, issuanceId, to string) (h
 //
 // Returns the issuer's address as a string, or an error if extraction fails.
 func (b *Blockchain) GetIssuerAddressFromIssuanceID(issuanceId string) (issuer string, err error) {
-	amount := types.MPTCurrencyAmount{
-		Value:         "1",
-		MPTIssuanceID: types.Hash192(issuanceId),
+	if len(issuanceId) != 48 {
+		return "", fmt.Errorf("invalid issuance ID length: expected 56 hex characters, got %d", len(issuanceId))
 	}
-	issuerAccId, err := amount.IssuerAccountID()
+
+	bytes, err := hex.DecodeString(issuanceId)
 	if err != nil {
-		return "", fmt.Errorf("failed to get issuer account id: %w", err)
+		return "", err
 	}
 
-	issuerAddr, err := addresscodec.EncodeAccountIDToClassicAddress(issuerAccId)
+	// Encode account ID bytes to classic address
+	issuerAddr, err := addresscodec.EncodeAccountIDToClassicAddress(bytes[4:])
 	if err != nil {
-		return "", fmt.Errorf("failed to encode account id %s to classic address: %w",
-			string(issuerAccId), err)
+		return "", fmt.Errorf("failed to encode account id to classic address: %w", err)
 	}
 
-	return string(issuerAddr), nil
-}
-
-// getBaseTx is a helper function that extracts base transaction information from a submit response.
-// It validates the response and returns the base transaction if successful.
-//
-// Parameters:
-// - resp: The submit response from the XRPL network
-//
-// Returns the base transaction or an error if extraction fails.
-func (b *Blockchain) getBaseTx(resp *clienttransactions.SubmitResponse) (baseTx *transactions.BaseTx, err error) {
-	if !strings.Contains(resp.EngineResult, "SUCCESS") {
-		return nil, fmt.Errorf("failed to submit: %s, %d, %s",
-			resp.EngineResult,
-			resp.EngineResultCode,
-			resp.EngineResultMessage)
-	}
-
-	baseTx = transactions.BaseTxForTransaction(resp.Tx)
-	if baseTx == nil {
-		return nil, fmt.Errorf("failed to cast to base transaction")
-	}
-
-	if baseTx.Hash == "" {
-		return nil, fmt.Errorf("transaction hash not available")
-	}
-
-	return baseTx, nil
+	return issuerAddr, nil
 }
 
 // MPToken represents a Multi-Purpose Token with associated metadata.
@@ -439,22 +363,22 @@ func NewMPToken(docHash, signature string) MPToken {
 // This includes token details, URLs, and additional information like document hash and signature.
 //
 // Returns the metadata structure or an error if creation fails.
-func (m MPToken) CreateMetadata() (ledger.MPTokenMetadata, error) {
+func (m MPToken) CreateMetadata() (MPTokenMetadata, error) {
 	addInfo, err := json.Marshal(map[string]string{
 		"document_hash": m.DocumentHash,
 		// "signature":     m.Signature,
 	})
 	if err != nil {
-		return ledger.MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)
+		return MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)
 	}
 
-	return ledger.MPTokenMetadata{
+	return MPTokenMetadata{
 		Ticker:        "FSWRNT",
 		Name:          "FortStock Warrant",
 		Desc:          "Digital representation of real-world asset-backed warrants",
 		AssetClass:    "rwa",
 		AssetSubclass: "other",
-		Urls: []ledger.MPTokenMetadataUrl{
+		Urls: []MPTokenMetadataUrl{
 			{
 				Url:   "https://fortstock.io",
 				Type:  "website",
