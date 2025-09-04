@@ -49,10 +49,10 @@ func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*ac
 		return nil, err
 	}
 
-	l.Info("account created", "address", w.Address)
+	l.Info("account created", "address", w.ClassicAddress)
 	return &accountv1.CreateResponse{
 		Account: &accountv1.Account{
-			Id: string(w.Address),
+			Id: string(w.ClassicAddress),
 		},
 	}, nil
 }
@@ -119,9 +119,9 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 		l.Error("failed to get XRPL address", "error", err)
 		return nil, err
 	}
-	if string(w.Address) != req.GetAccountId() {
-		l.Error("account id mismatch", "address", w.Address, "accountId", req.GetAccountId())
-		return nil, fmt.Errorf("account id mismatch: %s != %s", w.Address, req.GetAccountId())
+	if string(w.ClassicAddress) != req.GetAccountId() {
+		l.Error("account id mismatch", "address", w.ClassicAddress, "accountId", req.GetAccountId())
+		return nil, fmt.Errorf("account id mismatch: %s != %s", w.ClassicAddress, req.GetAccountId())
 	}
 
 	info, err := a.bc.GetAccountInfo(req.GetAccountId())

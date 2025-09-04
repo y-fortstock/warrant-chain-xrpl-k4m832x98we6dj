@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	ac "github.com/CreatureDev/xrpl-go/address-codec"
-	"github.com/CreatureDev/xrpl-go/keypairs"
+	ac "github.com/Peersyst/xrpl-go/address-codec"
+	"github.com/Peersyst/xrpl-go/keypairs"
+	"github.com/Peersyst/xrpl-go/xrpl/transaction/types"
+	"github.com/Peersyst/xrpl-go/xrpl/wallet"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 )
@@ -145,7 +147,10 @@ func GetXRPLWallet(key *hdkeychain.ExtendedKey) (address string, public string, 
 	}
 
 	accountID := ac.Sha256RipeMD160(pubKeyBytes)
-	address = ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+	address, err = ac.Encode(accountID, []byte{ac.AccountAddressPrefix}, ac.AccountAddressLength)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to encode account ID: %w", err)
+	}
 	return address, pubKeyHex, privKey, nil
 }
 
@@ -168,9 +173,74 @@ func getXRPLSecret(key *hdkeychain.ExtendedKey) (string, error) {
 
 	privKeyBytes := privKey.Serialize()
 
-	secret := ac.Encode(privKeyBytes,
+	secret, err := ac.Encode(privKeyBytes,
 		[]byte{0x01, 0xe1, 0x4b},
 		32,
 	)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode secret: %w", err)
+	}
 	return secret, nil
+}
+
+// NewWallet creates a new Wallet from address, public key, and private key
+func NewWallet(address types.Address, publicKey string, privateKey string) (*wallet.Wallet, error) {
+	if address == "" {
+		return nil, fmt.Errorf("system account is not set")
+	}
+	if publicKey == "" {
+		return nil, fmt.Errorf("system public key is not set")
+	}
+	if privateKey == "" {
+		return nil, fmt.Errorf("system secret key is not set")
+	}
+
+	return &wallet.Wallet{
+		ClassicAddress: address,
+		PublicKey:      publicKey,
+		PrivateKey:     privateKey,
+	}, nil
+}
+
+// NewWalletFromExtendedKey creates a new Wallet from an extended key.
+// It derives the wallet components using the XRPL-specific key derivation process.
+//
+// This function is useful when you have an extended key from BIP-44 derivation
+// and want to create a complete XRPL wallet.
+//
+// Parameters:
+// - key: An extended key derived from a BIP-44 path
+//
+// Returns a new Wallet instance or an error if creation fails.
+// The function handles the conversion from extended key to wallet components.
+func NewWalletFromExtendedKey(key *hdkeychain.ExtendedKey) (*wallet.Wallet, error) {
+	if key == nil {
+		return nil, fmt.Errorf("extended key cannot be nil")
+	}
+	address, public, private, err := GetXRPLWallet(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWallet(types.Address(address), public, private)
+}
+
+// NewWalletFromHexSeed creates a new Wallet from a hexadecimal seed and derivation path.
+// It combines the seed derivation and wallet creation into a single function.
+//
+// This is the most convenient way to create wallets from seed phrases.
+// The function handles the complete process from seed to usable wallet.
+//
+// Parameters:
+// - hexSeed: A 64-character hexadecimal string representing the master seed
+// - path: The BIP-44 derivation path (e.g., "m/44'/144'/0'/0/0")
+//
+// Returns a new Wallet instance or an error if creation fails.
+// The path should follow BIP-44 standard with XRPL coin type 144.
+func NewWalletFromHexSeed(hexSeed string, path string) (*wallet.Wallet, error) {
+	key, err := GetExtendedKeyFromHexSeedWithPath(hexSeed, path)
+	if err != nil {
+		return nil, err
+	}
+	return NewWalletFromExtendedKey(key)
 }

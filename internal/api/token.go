@@ -73,8 +73,8 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 		l.Error("failed to create wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create wallet: %v", err)
 	}
-	if strings.ToLower(string(warehouse.Address)) != strings.ToLower(req.GetWarehouseAddressId()) {
-		l.Error("warehouse address does not match", "warehouse_address", string(warehouse.Address))
+	if !strings.EqualFold(warehouse.ClassicAddress.String(), req.GetWarehouseAddressId()) {
+		l.Error("warehouse address does not match", "warehouse_address", warehouse.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "warehouse address does not match")
 	}
 
@@ -87,8 +87,8 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 		l.Error("failed to create owner wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create owner wallet: %v", err)
 	}
-	if strings.ToLower(string(owner.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
-		l.Error("owner address does not match", "owner_address", string(owner.Address))
+	if !strings.EqualFold(owner.ClassicAddress.String(), req.GetOwnerAddressId()) {
+		l.Error("owner address does not match", "owner_address", owner.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
@@ -118,7 +118,7 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	}
 
 	l.Debug("transferring token to owner", "issuance_id", issuanceID)
-	hash, err = t.bc.TransferMPToken(warehouse, issuanceID, string(owner.Address))
+	hash, err = t.bc.TransferMPToken(warehouse, issuanceID, owner.ClassicAddress.String())
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -166,8 +166,8 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		t.logger.Error("failed to create recipient wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create recipient wallet: %v", err)
 	}
-	if strings.ToLower(string(recipient.Address)) != strings.ToLower(req.GetReceiverAddressId()) {
-		l.Error("recipient address does not match", "recipient_address", string(recipient.Address))
+	if !strings.EqualFold(recipient.ClassicAddress.String(), req.GetReceiverAddressId()) {
+		l.Error("recipient address does not match", "recipient_address", recipient.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "recipient address does not match")
 	}
 
@@ -177,8 +177,8 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		t.logger.Error("failed to create sender wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create sender wallet: %v", err)
 	}
-	if strings.ToLower(string(sender.Address)) != strings.ToLower(req.GetSenderAddressId()) {
-		l.Error("sender address does not match", "sender_address", string(sender.Address))
+	if !strings.EqualFold(sender.ClassicAddress.String(), req.GetSenderAddressId()) {
+		l.Error("sender address does not match", "sender_address", sender.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "sender address does not match")
 	}
 
@@ -187,7 +187,7 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		l.Warn("failed to authorize token", "error", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(sender, req.GetTokenId(), string(recipient.Address))
+	hash, err := t.bc.TransferMPToken(sender, req.GetTokenId(), recipient.ClassicAddress.String())
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -235,8 +235,8 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		t.logger.Error("failed to create recipient wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create recipient wallet: %v", err)
 	}
-	if strings.ToLower(string(creditor.Address)) != strings.ToLower(req.GetCreditorAddressId()) {
-		l.Error("creditor address does not match", "creditor_address", string(creditor.Address))
+	if !strings.EqualFold(creditor.ClassicAddress.String(), req.GetCreditorAddressId()) {
+		l.Error("creditor address does not match", "creditor_address", creditor.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "creditor address does not match")
 	}
 
@@ -246,17 +246,17 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		t.logger.Error("failed to create sender wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create sender wallet: %v", err)
 	}
-	if strings.ToLower(string(owner.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
-		l.Error("owner address does not match", "owner_address", string(owner.Address))
+	if !strings.EqualFold(owner.ClassicAddress.String(), req.GetOwnerAddressId()) {
+		l.Error("owner address does not match", "owner_address", owner.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	_, err = t.bc.GetAccountInfo(string(creditor.Address))
+	_, err = t.bc.GetAccountInfo(creditor.ClassicAddress.String())
 	if err != nil {
 		// Account doesn't exist, send 2 XRP to fund it
 		l.Info("creditor account does not exist, funding with 2 XRP")
 		// 1 XRP = 1,000,000 drops in the XRPL network
-		hash, err := t.bc.PaymentFromSystemAccount(string(creditor.Address), 2*1000000)
+		hash, err := t.bc.PaymentFromSystemAccount(creditor.ClassicAddress.String(), 2*1000000)
 		if err != nil {
 			l.Error("failed to fund creditor account", "error", err)
 			return nil, status.Errorf(codes.Internal, "failed to fund creditor account: %v", err)
@@ -272,7 +272,7 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 	l.Debug("authorized token", "hash", hash)
 
 	l.Debug("transferring token to creditor")
-	hash, err = t.bc.TransferMPToken(owner, req.GetTokenId(), string(creditor.Address))
+	hash, err = t.bc.TransferMPToken(owner, req.GetTokenId(), creditor.ClassicAddress.String())
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -320,8 +320,8 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		t.logger.Error("failed to create recipient wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create recipient wallet: %v", err)
 	}
-	if strings.ToLower(string(creditor.Address)) != strings.ToLower(req.GetCreditorAddressId()) {
-		l.Error("creditor address does not match", "creditor_address", string(creditor.Address))
+	if !strings.EqualFold(creditor.ClassicAddress.String(), req.GetCreditorAddressId()) {
+		l.Error("creditor address does not match", "creditor_address", creditor.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "creditor address does not match")
 	}
 
@@ -331,8 +331,8 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		t.logger.Error("failed to create sender wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create sender wallet: %v", err)
 	}
-	if strings.ToLower(string(owner.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
-		l.Error("owner address does not match", "owner_address", string(owner.Address))
+	if !strings.EqualFold(owner.ClassicAddress.String(), req.GetOwnerAddressId()) {
+		l.Error("owner address does not match", "owner_address", owner.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
@@ -341,7 +341,7 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		l.Warn("failed to authorize token", "error", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), string(owner.Address))
+	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), owner.ClassicAddress.String())
 	if err != nil {
 		l.Error("failed to transfer token", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
@@ -386,8 +386,8 @@ func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.T
 		t.logger.Error("failed to create sender wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create sender wallet: %v", err)
 	}
-	if strings.ToLower(string(owner.Address)) != strings.ToLower(req.GetOwnerAddressId()) {
-		l.Error("owner address does not match", "owner_address", string(owner.Address))
+	if !strings.EqualFold(owner.ClassicAddress.String(), req.GetOwnerAddressId()) {
+		l.Error("owner address does not match", "owner_address", owner.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
@@ -442,8 +442,8 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 		t.logger.Error("failed to create sender wallet", "error", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create sender wallet: %v", err)
 	}
-	if strings.ToLower(string(creditor.Address)) != strings.ToLower(req.GetCreditorAddressId()) {
-		l.Error("creditor address does not match", "creditor_address", string(creditor.Address))
+	if !strings.EqualFold(creditor.ClassicAddress.String(), req.GetCreditorAddressId()) {
+		l.Error("creditor address does not match", "creditor_address", creditor.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "creditor address does not match")
 	}
 
