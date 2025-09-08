@@ -347,15 +347,15 @@ func (b *Blockchain) GetIssuerAddressFromIssuanceID(issuanceId string) (issuer s
 // It contains document hash and signature information for asset-backed tokens.
 type MPToken struct {
 	DocumentHash string
-	Signature    string
+	Issuer       string
 }
 
 // NewMPToken creates and returns a new MPToken instance.
 // It requires a document hash and signature for token creation.
-func NewMPToken(docHash, signature string) MPToken {
+func NewMPToken(docHash, issuer string) MPToken {
 	return MPToken{
 		DocumentHash: docHash,
-		Signature:    signature,
+		Issuer:       issuer,
 	}
 }
 
@@ -366,7 +366,6 @@ func NewMPToken(docHash, signature string) MPToken {
 func (m MPToken) CreateMetadata() (MPTokenMetadata, error) {
 	addInfo, err := json.Marshal(map[string]string{
 		"document_hash": m.DocumentHash,
-		// "signature":     m.Signature,
 	})
 	if err != nil {
 		return MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)
@@ -377,7 +376,8 @@ func (m MPToken) CreateMetadata() (MPTokenMetadata, error) {
 		Name:          "FortStock Warrant",
 		Desc:          "Digital representation of real-world asset-backed warrants",
 		AssetClass:    "rwa",
-		AssetSubclass: "other",
+		AssetSubclass: "commodity",
+		IssuerName:    m.Issuer,
 		Urls: []MPTokenMetadataUrl{
 			{
 				Url:   "https://fortstock.io",
