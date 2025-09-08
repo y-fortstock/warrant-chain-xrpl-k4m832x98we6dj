@@ -536,7 +536,7 @@ func (b *Blockchain) Deployment(borrower, lender wallet.Wallet, warrantMptIssuan
 	if err != nil {
 		return nil, fmt.Errorf("lender failed to distribute RLUSD to borrower: %w", err)
 	}
-	fmt.Printf("#️⃣ RLUSD Payment Hash: %+v\n", paymentTx.Hash)
+	fmt.Printf("#️⃣ Lender Distributes RLUSD To Borrower Hash: %+v\n", paymentTx.Hash)
 
 	return nil, nil
 }
@@ -577,7 +577,7 @@ func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
 	if err != nil {
 		return fmt.Errorf("borrower failed to repay full loan: %w", err)
 	}
-	fmt.Printf("#️⃣ Repayment RLUSD Payment Hash: %+v\n", paymentTx.Hash)
+	fmt.Printf("#️⃣ Borrower Repays Full Loan RLUSD Payment Hash: %+v\n", paymentTx.Hash)
 
 	// Borrower burns Debt MPT
 	burnMPT := &transactions.MPTokenIssuanceDestroy{
@@ -595,7 +595,7 @@ func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
 	if err != nil {
 		return fmt.Errorf("borrower failed to burn Debt MPT: %w", err)
 	}
-	fmt.Printf("#️⃣ Burn Debt MPT Hash: %+v\n", burnMPTTx.Hash)
+	fmt.Printf("#️⃣ Borrower Burns Debt MPT Hash: %+v\n", burnMPTTx.Hash)
 
 	// Lender return warrant MPT to borrower
 	returnWarrantMPT := transactions.Payment{
@@ -616,7 +616,7 @@ func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
 	if err != nil {
 		return fmt.Errorf("lender failed to return warrant MPT to borrower: %w", err)
 	}
-	fmt.Printf("#️⃣ Return Warrant MPT Hash: %+v\n", returnWarrantMPTTx.Hash)
+	fmt.Printf("#️⃣ Lender Returns Warrant MPT To Borrower Hash: %+v\n", returnWarrantMPTTx.Hash)
 
 	// Borrower return warrant MPT to warehouse
 	returnWarrantMPTToBorrower := transactions.Payment{
@@ -637,7 +637,7 @@ func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
 	if err != nil {
 		return fmt.Errorf("borrower failed to return warrant MPT to warehouse: %w", err)
 	}
-	fmt.Printf("#️⃣ Return Warrant MPT Hash: %+v\n", returnWarrantMPTTxToBorrowerTx.Hash)
+	fmt.Printf("#️⃣ Borrower Returns Warrant MPT To Warehouse Hash: %+v\n", returnWarrantMPTTxToBorrowerTx.Hash)
 
 	// Warehouse burns warrant MPT
 	burnWarrantMPT := &transactions.MPTokenIssuanceDestroy{
@@ -655,7 +655,7 @@ func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
 	if err != nil {
 		return fmt.Errorf("warehouse failed to burn warrant MPT: %w", err)
 	}
-	fmt.Printf("#️⃣ Burn Warrant MPT Hash: %+v\n", burnWarrantMPTTx.Hash)
+	fmt.Printf("#️⃣ Warehouse Burns Warrant MPT Hash: %+v\n", burnWarrantMPTTx.Hash)
 
 	return nil
 }
