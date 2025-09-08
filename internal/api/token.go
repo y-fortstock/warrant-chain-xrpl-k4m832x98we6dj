@@ -66,6 +66,8 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 		"document_hash", req.GetDocumentHash(),
 		"warehouse_id", req.GetWarehouseAddressId())
 	l.Debug("start", "owner_address_id", req.GetOwnerAddressId())
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	seeds := strings.Split(req.GetWarehousePass(), "-")
 	warehouse, err := crypto.NewWalletFromHexSeed(seeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", seeds[1]))
@@ -159,6 +161,8 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		"token_id", req.GetTokenId(),
 	)
 	l.Debug("start")
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	recipientSeeds := strings.Split(req.GetReceiverPass(), "-")
 	recipient, err := crypto.NewWalletFromHexSeed(recipientSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", recipientSeeds[1]))
@@ -228,6 +232,8 @@ func (t *Token) TransferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		"token_id", req.GetTokenId(),
 	)
 	l.Debug("start")
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	creditorSeeds := strings.Split(req.GetCreditorPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
@@ -313,6 +319,8 @@ func (t *Token) BuyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 		"token_id", req.GetTokenId(),
 	)
 	l.Debug("start")
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	creditorSeeds := strings.Split(req.GetCreditorAddressPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
@@ -379,6 +387,8 @@ func (t *Token) TransferFromOwnerToWarehouse(ctx context.Context, req *tokenv1.T
 		"token_id", req.GetTokenId(),
 	)
 	l.Debug("start")
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	ownerSeeds := strings.Split(req.GetOwnerAddressPass(), "-")
 	owner, err := crypto.NewWalletFromHexSeed(ownerSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", ownerSeeds[1]))
@@ -435,6 +445,8 @@ func (t *Token) TransferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 		"token_id", req.GetTokenId(),
 	)
 	l.Debug("start")
+	t.bc.Lock()
+	defer t.bc.Unlock()
 
 	creditorSeeds := strings.Split(req.GetCreditorAddressPass(), "-")
 	creditor, err := crypto.NewWalletFromHexSeed(creditorSeeds[0], fmt.Sprintf("m/44'/144'/0'/0/%s", creditorSeeds[1]))
