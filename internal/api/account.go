@@ -68,6 +68,8 @@ func (a *Account) Create(ctx context.Context, req *accountv1.CreateRequest) (*ac
 func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*accountv1.DepositResponse, error) {
 	l := a.logger.With("method", "Deposit", "account", req.GetAccountId())
 	l.Debug("start", "amount", req.GetWeiAmount())
+	a.bc.Lock()
+	defer a.bc.Unlock()
 
 	dropsToTransfer, err := strconv.ParseUint(req.GetWeiAmount(), 10, 64)
 	if err != nil {
@@ -108,6 +110,8 @@ func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*
 func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceRequest) (*accountv1.ClearBalanceResponse, error) {
 	l := a.logger.With("method", "ClearBalance", "account", req.GetAccountId())
 	l.Debug("start")
+	a.bc.Lock()
+	defer a.bc.Unlock()
 
 	seeds := strings.Split(req.GetAccountPassword(), "-")
 	if len(seeds) != 2 {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	addresscodec "github.com/Peersyst/xrpl-go/address-codec"
@@ -39,8 +40,9 @@ type SubmittableTransaction interface {
 // It provides methods for interacting with the XRPL network, including
 // account operations, transaction submission, and token management.
 type Blockchain struct {
-	c *rpc.Client
-	w *wallet.Wallet
+	mu sync.RWMutex
+	c  *rpc.Client
+	w  *wallet.Wallet
 }
 
 // NewBlockchain creates and returns a new Blockchain instance.
@@ -68,6 +70,20 @@ func NewBlockchain(cfg config.NetworkConfig) (*Blockchain, error) {
 		c: client,
 		w: w,
 	}, nil
+}
+
+// Lock acquires an exclusive lock on the blockchain instance.
+// This method should be called before performing any operations that require
+// exclusive access to the blockchain state.
+func (b *Blockchain) Lock() {
+	b.mu.Lock()
+}
+
+// Unlock releases the exclusive lock on the blockchain instance.
+// This method should be called after completing operations that required
+// exclusive access to the blockchain state.
+func (b *Blockchain) Unlock() {
+	b.mu.Unlock()
 }
 
 // GetBaseFeeAndReserve retrieves the current base fee and reserve requirements from the XRPL network.
