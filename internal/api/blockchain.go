@@ -4,7 +4,6 @@ package api
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -40,7 +39,7 @@ type SubmittableTransaction interface {
 // It provides methods for interacting with the XRPL network, including
 // account operations, transaction submission, and token management.
 type Blockchain struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 	c  *rpc.Client
 	w  *wallet.Wallet
 }
@@ -288,7 +287,7 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *wallet.Wallet, mpt MPToken) (txHas
 		return "", "", fmt.Errorf("failed to submit tx: %w", err)
 	}
 
-	issuanceID, err = mpt.CreateIssuanceID(string(w.ClassicAddress), tx.Sequence)
+	issuanceID, err = CreateIssuanceID(string(w.ClassicAddress), tx.Sequence)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
 	}
@@ -357,72 +356,4 @@ func (b *Blockchain) GetIssuerAddressFromIssuanceID(issuanceId string) (issuer s
 	}
 
 	return issuerAddr, nil
-}
-
-// MPToken represents a Multi-Purpose Token with associated metadata.
-// It contains document hash and signature information for asset-backed tokens.
-type MPToken struct {
-	DocumentHash string
-	Issuer       string
-}
-
-// NewMPToken creates and returns a new MPToken instance.
-// It requires a document hash and signature for token creation.
-func NewMPToken(docHash, issuer string) MPToken {
-	return MPToken{
-		DocumentHash: docHash,
-		Issuer:       issuer,
-	}
-}
-
-// CreateMetadata generates the metadata structure required for MPT creation.
-// This includes token details, URLs, and additional information like document hash and signature.
-//
-// Returns the metadata structure or an error if creation fails.
-func (m MPToken) CreateMetadata() (MPTokenMetadata, error) {
-	addInfo, err := json.Marshal(map[string]string{
-		"document_hash": m.DocumentHash,
-	})
-	if err != nil {
-		return MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)
-	}
-
-	return MPTokenMetadata{
-		Ticker:        "FSWRNT",
-		Name:          "FortStock Warrant",
-		Desc:          "Digital representation of real-world asset-backed warrants",
-		AssetClass:    "rwa",
-		AssetSubclass: "commodity",
-		IssuerName:    m.Issuer,
-		Urls: []MPTokenMetadataUrl{
-			{
-				Url:   "https://fortstock.io",
-				Type:  "website",
-				Title: "Home",
-			},
-			{
-				Url:   "https://fortstock.io/rulebook/",
-				Type:  "document",
-				Title: "Legal framework",
-			},
-		},
-		AdditionalInfo: addInfo,
-	}, nil
-}
-
-// CreateIssuanceID generates a unique issuance ID for the token.
-// This ID combines the issuer's account ID with the transaction sequence number.
-//
-// Parameters:
-// - issuer: The issuer's account address
-// - sequence: The transaction sequence number
-//
-// Returns the issuance ID as a string, or an error if generation fails.
-func (m MPToken) CreateIssuanceID(issuer string, sequence uint32) (string, error) {
-	_, accountID, err := addresscodec.DecodeClassicAddressToAccountID(issuer)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode classic address to account id: %w", err)
-	}
-	accountIDHex := fmt.Sprintf("%X", accountID)
-	return fmt.Sprintf("%08X%s", sequence, accountIDHex), nil
 }

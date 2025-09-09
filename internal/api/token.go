@@ -103,7 +103,7 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	}
 
 	l.Debug("issuing mpt token")
-	mpt := NewMPToken(req.GetDocumentHash(), warehouse.ClassicAddress.String())
+	mpt := NewWarrantMPToken(req.GetDocumentHash(), warehouse.ClassicAddress.String())
 	hash, issuanceID, err := t.bc.MPTokenIssuanceCreate(warehouse, mpt)
 	if err != nil {
 		l.Error("failed to create issuance", "error", err)

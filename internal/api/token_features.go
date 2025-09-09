@@ -22,25 +22,25 @@ const (
 )
 
 type Loan struct {
-	LoanAmount          uint64 // in Currency * 100
-	LoanInterestRate    uint64 // in % * 100
-	LoanPeriod          time.Duration
-	LoanNextPaymentDate time.Time
-	OwnerWallet         *wallet.Wallet
-	CreditorWallet      *wallet.Wallet
-	LoanCurrency        string
+	Amount          uint64 // in Currency * 100
+	InterestRate    uint64 // in % * 100
+	Period          time.Duration
+	NextPaymentDate time.Time
+	OwnerWallet     *wallet.Wallet
+	CreditorWallet  *wallet.Wallet
+	Currency        string
 	// LoanEndDate         time.Time
 }
 
 func NewLoan(ownerWallet *wallet.Wallet, creditorWallet *wallet.Wallet) Loan {
 	return Loan{
-		LoanAmount:          LoanAmount,
-		LoanCurrency:        LoanCurrency,
-		LoanInterestRate:    LoanInterestRate,
-		LoanPeriod:          LoanPeriod,
-		LoanNextPaymentDate: time.Now().Add(LoanPeriod),
-		OwnerWallet:         ownerWallet,
-		CreditorWallet:      creditorWallet,
+		Amount:          LoanAmount,
+		Currency:        LoanCurrency,
+		InterestRate:    LoanInterestRate,
+		Period:          LoanPeriod,
+		NextPaymentDate: time.Now().Add(LoanPeriod),
+		OwnerWallet:     ownerWallet,
+		CreditorWallet:  creditorWallet,
 	}
 }
 
@@ -116,21 +116,6 @@ func (t *Token) transferToCreditor(ctx context.Context, req *tokenv1.TransferToC
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	// TODO: Remove this after upd backend to use replenish
-	_, err = t.bc.GetAccountInfo(creditor.ClassicAddress.String())
-	if err != nil {
-		// Account doesn't exist, send 2 XRP to fund it
-		l.Info("creditor account does not exist, funding with 2 XRP")
-		// 1 XRP = 1,000,000 drops in the XRPL network
-		hash, err := t.bc.PaymentFromSystemAccount(creditor.ClassicAddress.String(), 2*1000000)
-		if err != nil {
-			l.Error("failed to fund creditor account", "error", err)
-			return nil, status.Errorf(codes.Internal, "failed to fund creditor account: %v", err)
-		}
-		l.Info("successfully funded creditor account", "hash", hash, "amount", "2 XRP")
-	}
-	// TODO: END of removing
-
 	l.Debug("authorizing token")
 	hash, err := t.bc.AuthorizeMPToken(creditor, req.GetTokenId())
 	if err != nil {
@@ -190,21 +175,6 @@ func (t *Token) transferToCreditorWithLoan(ctx context.Context, req *tokenv1.Tra
 		l.Error("owner address does not match", "owner_address", owner.ClassicAddress.String())
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
-
-	// TODO: Remove this after upd backend to use replenish
-	_, err = t.bc.GetAccountInfo(creditor.ClassicAddress.String())
-	if err != nil {
-		// Account doesn't exist, send 2 XRP to fund it
-		l.Info("creditor account does not exist, funding with 2 XRP")
-		// 1 XRP = 1,000,000 drops in the XRPL network
-		hash, err := t.bc.PaymentFromSystemAccount(creditor.ClassicAddress.String(), 2*1000000)
-		if err != nil {
-			l.Error("failed to fund creditor account", "error", err)
-			return nil, status.Errorf(codes.Internal, "failed to fund creditor account: %v", err)
-		}
-		l.Info("successfully funded creditor account", "hash", hash, "amount", "2 XRP")
-	}
-	// TODO: END of removing
 
 	// TODO: implement Deployment of loan here
 	// TODO: implement Deployment of loan here
