@@ -310,7 +310,10 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for Flags
 	var flags float64
-	if flagsFloat, ok := txResp.Tx["Flags"].(float64); ok {
+	if txResp.Tx["Flags"] == nil {
+		// Flags can be nil if not set
+		flags = 0
+	} else if flagsFloat, ok := txResp.Tx["Flags"].(float64); ok {
 		flags = flagsFloat
 	} else if flagsString, ok := txResp.Tx["Flags"].(string); ok {
 		if parsedFlags, err := strconv.ParseFloat(flagsString, 64); err == nil {
@@ -330,7 +333,10 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for LastLedgerSequence
 	var lastLedgerSeq float64
-	if lastLedgerSeqFloat, ok := txResp.Tx["LastLedgerSequence"].(float64); ok {
+	if txResp.Tx["LastLedgerSequence"] == nil {
+		// LastLedgerSequence can be nil if not set
+		lastLedgerSeq = 0
+	} else if lastLedgerSeqFloat, ok := txResp.Tx["LastLedgerSequence"].(float64); ok {
 		lastLedgerSeq = lastLedgerSeqFloat
 	} else if lastLedgerSeqString, ok := txResp.Tx["LastLedgerSequence"].(string); ok {
 		if parsedLastLedgerSeq, err := strconv.ParseFloat(lastLedgerSeqString, 64); err == nil {
@@ -350,7 +356,10 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for Sequence
 	var sequence float64
-	if sequenceFloat, ok := txResp.Tx["Sequence"].(float64); ok {
+	if txResp.Tx["Sequence"] == nil {
+		// Sequence should not be nil, but handle it gracefully
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("sequence is required but was nil")
+	} else if sequenceFloat, ok := txResp.Tx["Sequence"].(float64); ok {
 		sequence = sequenceFloat
 	} else if sequenceString, ok := txResp.Tx["Sequence"].(string); ok {
 		if parsedSequence, err := strconv.ParseFloat(sequenceString, 64); err == nil {
