@@ -102,11 +102,13 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 		return nil, status.Errorf(codes.Internal, "failed to create issuance: %v", err)
 	}
 
-	for {
+	for i := 0; i < 5; i++ {
 		time.Sleep(4 * time.Second)
 		_, meta, _, err := t.bc.GetTransactionInfo(hash)
 		if err != nil {
-			l.Error("failed to get transaction info", "error", err)
+			l.Warn("failed to get transaction info",
+				"hash", hash,
+				"error", err)
 		}
 		if strings.Contains(meta.TransactionResult, "SUCCESS") {
 			break
