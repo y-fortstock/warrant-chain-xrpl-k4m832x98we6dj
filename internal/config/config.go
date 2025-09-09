@@ -49,6 +49,14 @@ type NetworkConfig struct {
 	} `mapstructure:"system"`
 }
 
+// FeatureConfig holds configuration for feature flags.
+// It controls which features are enabled or disabled in the application.
+type FeatureConfig struct {
+	// Loan specifies whether the loan feature is enabled.
+	// When true, loan-related functionality will be available.
+	Loan bool `mapstructure:"loan"`
+}
+
 // Config contains all configuration parameters for the application.
 // It aggregates settings from multiple sources and provides a unified interface.
 type Config struct {
@@ -57,6 +65,9 @@ type Config struct {
 
 	// Network contains XRPL network connection settings.
 	Network NetworkConfig `mapstructure:"network"`
+
+	// Features contains feature flag configuration settings.
+	Features FeatureConfig `mapstructure:"features"`
 
 	// Server contains HTTP/gRPC server configuration.
 	Server struct {
@@ -96,6 +107,14 @@ func (c *Config) LoggerConfig() LogConfig {
 // Returns the NetworkConfig section of the main configuration.
 func (c *Config) NetworkConfig() NetworkConfig {
 	return c.Network
+}
+
+// FeatureConfig returns a FeatureConfig constructed from the config values.
+// This method provides access to feature configuration in a structured format.
+//
+// Returns the FeatureConfig section of the main configuration.
+func (c *Config) FeatureConfig() FeatureConfig {
+	return c.Features
 }
 
 // RedactedConfigLog returns a string representation of the config with sensitive fields redacted.

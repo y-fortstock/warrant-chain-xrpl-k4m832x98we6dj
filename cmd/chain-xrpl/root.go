@@ -40,6 +40,7 @@ func initConfig() {
 	viper.BindEnv("network.system.account", "CHAIN_SYSTEM_ACCOUNT")
 	viper.BindEnv("network.system.secret", "CHAIN_SYSTEM_SECRET")
 	viper.BindEnv("network.system.public", "CHAIN_SYSTEM_PUBLIC")
+	viper.BindEnv("features.loan")
 
 	// Set default
 	viper.SetDefault("log.level", "info")
@@ -47,6 +48,7 @@ func initConfig() {
 	viper.SetDefault("server.listen", ":8099")
 	viper.SetDefault("network.url", "https://s.altnet.rippletest.net:51234/")
 	viper.SetDefault("network.timeout", 30)
+	viper.SetDefault("features.loan", false)
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
