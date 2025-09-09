@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -142,6 +143,69 @@ func (b *Blockchain) SubmitTx(w *wallet.Wallet, tx SubmittableTransaction) (
 	return hash, nil
 }
 
+// SubmitTxWithSequence submits a transaction to the XRPL network and returns the hash and sequence.
+func (b *Blockchain) SubmitTxWithSequence(w *wallet.Wallet, tx SubmittableTransaction) (
+	hash string, sequence uint32, err error) {
+	if w == nil {
+		return "", 0, fmt.Errorf("wallet cannot be nil")
+	}
+	if tx == nil {
+		return "", 0, fmt.Errorf("transaction cannot be nil")
+	}
+
+	// Access BaseTx fields directly since all transaction types embed BaseTx
+	flattenedTx := tx.Flatten()
+	flattenedTx["Account"] = w.ClassicAddress.String()
+	flattenedTx["SigningPubKey"] = w.PublicKey
+
+	resp, err := b.c.SubmitTx(flattenedTx, &rpctypes.SubmitOptions{
+		Autofill: true,
+		FailHard: false,
+		Wallet:   w,
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to submit tx: %w", err)
+	}
+
+	if resp.EngineResult != string(transactions.TesSUCCESS) {
+		return "", 0, &rpc.ClientError{ErrorString: "transaction failed to submit with engine result: " + resp.EngineResult}
+	}
+
+	hash = resp.Tx["hash"].(string)
+	if hash == "" {
+		return "", 0, fmt.Errorf("hash is empty")
+	}
+
+	// Get sequence from the response
+	sequenceValue, ok := resp.Tx["Sequence"]
+	if !ok {
+		return "", 0, fmt.Errorf("sequence not found in response")
+	}
+
+	// Handle different numeric types that might be returned
+	switch v := sequenceValue.(type) {
+	case uint32:
+		sequence = v
+	case int:
+		sequence = uint32(v)
+	case float64:
+		sequence = uint32(v)
+	case int64:
+		sequence = uint32(v)
+	case json.Number:
+		// Handle json.Number type
+		intVal, err := v.Int64()
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to convert sequence to int64: %w", err)
+		}
+		sequence = uint32(intVal)
+	default:
+		return "", 0, fmt.Errorf("sequence has unexpected type: %T", v)
+	}
+
+	return hash, sequence, nil
+}
+
 // GetAccountInfo retrieves detailed information about an XRPL account.
 // This includes the account's balance, sequence number, and other account-specific data.
 //
@@ -189,24 +253,145 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 	if txResp.Meta == nil {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("metadata is nil")
 	}
-	if txResp.Tx == nil {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction is nil")
+	if len(txResp.Tx) == 0 {
+		// Check if this is a "not found" case by looking at the response
+		if txResp.LedgerIndex == 0 && !txResp.Validated {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction not found or not yet confirmed")
+		}
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction is nil or empty (ledger_index: %v, validated: %v)", txResp.LedgerIndex, txResp.Validated)
 	}
 
 	if objMeta, ok := txResp.Meta.(transactions.TxObjMeta); ok {
 		meta = objMeta
 	} else {
-		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to cast metadata to TxObjMeta")
+		// Try to convert from map[string]interface{} to TxObjMeta using JSON marshaling/unmarshaling
+		if metaMap, ok := txResp.Meta.(map[string]interface{}); ok {
+			// Convert map to JSON and then unmarshal to TxObjMeta
+			jsonData, err := json.Marshal(metaMap)
+			if err != nil {
+				return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to marshal metadata: %w", err)
+			}
+			err = json.Unmarshal(jsonData, &meta)
+			if err != nil {
+				return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to unmarshal metadata to TxObjMeta: %w", err)
+			}
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to cast metadata to TxObjMeta, got type: %T", txResp.Meta)
+		}
 	}
+
+	// Safely extract fields from transaction with type assertions
+	account, ok := txResp.Tx["Account"].(string)
+	if !ok {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Account from transaction")
+	}
+
+	// Try different types for Fee
+	var fee float64
+	if feeFloat, ok := txResp.Tx["Fee"].(float64); ok {
+		fee = feeFloat
+	} else if feeString, ok := txResp.Tx["Fee"].(string); ok {
+		// Try to parse string to float64
+		if parsedFee, err := strconv.ParseFloat(feeString, 64); err == nil {
+			fee = parsedFee
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Fee string '%s': %w", feeString, err)
+		}
+	} else if feeNumber, ok := txResp.Tx["Fee"].(json.Number); ok {
+		// Try to parse json.Number to float64
+		if parsedFee, err := feeNumber.Float64(); err == nil {
+			fee = parsedFee
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Fee json.Number '%s': %w", feeNumber, err)
+		}
+	} else {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Fee from transaction, got type: %T", txResp.Tx["Fee"])
+	}
+
+	// Try different types for Flags
+	var flags float64
+	if flagsFloat, ok := txResp.Tx["Flags"].(float64); ok {
+		flags = flagsFloat
+	} else if flagsString, ok := txResp.Tx["Flags"].(string); ok {
+		if parsedFlags, err := strconv.ParseFloat(flagsString, 64); err == nil {
+			flags = parsedFlags
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Flags string '%s': %w", flagsString, err)
+		}
+	} else if flagsNumber, ok := txResp.Tx["Flags"].(json.Number); ok {
+		if parsedFlags, err := flagsNumber.Float64(); err == nil {
+			flags = parsedFlags
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Flags json.Number '%s': %w", flagsNumber, err)
+		}
+	} else {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Flags from transaction, got type: %T", txResp.Tx["Flags"])
+	}
+
+	// Try different types for LastLedgerSequence
+	var lastLedgerSeq float64
+	if lastLedgerSeqFloat, ok := txResp.Tx["LastLedgerSequence"].(float64); ok {
+		lastLedgerSeq = lastLedgerSeqFloat
+	} else if lastLedgerSeqString, ok := txResp.Tx["LastLedgerSequence"].(string); ok {
+		if parsedLastLedgerSeq, err := strconv.ParseFloat(lastLedgerSeqString, 64); err == nil {
+			lastLedgerSeq = parsedLastLedgerSeq
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse LastLedgerSequence string '%s': %w", lastLedgerSeqString, err)
+		}
+	} else if lastLedgerSeqNumber, ok := txResp.Tx["LastLedgerSequence"].(json.Number); ok {
+		if parsedLastLedgerSeq, err := lastLedgerSeqNumber.Float64(); err == nil {
+			lastLedgerSeq = parsedLastLedgerSeq
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse LastLedgerSequence json.Number '%s': %w", lastLedgerSeqNumber, err)
+		}
+	} else {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract LastLedgerSequence from transaction, got type: %T", txResp.Tx["LastLedgerSequence"])
+	}
+
+	// Try different types for Sequence
+	var sequence float64
+	if sequenceFloat, ok := txResp.Tx["Sequence"].(float64); ok {
+		sequence = sequenceFloat
+	} else if sequenceString, ok := txResp.Tx["Sequence"].(string); ok {
+		if parsedSequence, err := strconv.ParseFloat(sequenceString, 64); err == nil {
+			sequence = parsedSequence
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Sequence string '%s': %w", sequenceString, err)
+		}
+	} else if sequenceNumber, ok := txResp.Tx["Sequence"].(json.Number); ok {
+		if parsedSequence, err := sequenceNumber.Float64(); err == nil {
+			sequence = parsedSequence
+		} else {
+			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Sequence json.Number '%s': %w", sequenceNumber, err)
+		}
+	} else {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Sequence from transaction, got type: %T", txResp.Tx["Sequence"])
+	}
+
+	signingPubKey, ok := txResp.Tx["SigningPubKey"].(string)
+	if !ok {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract SigningPubKey from transaction")
+	}
+
+	transactionType, ok := txResp.Tx["TransactionType"].(string)
+	if !ok {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract TransactionType from transaction")
+	}
+
+	txnSignature, ok := txResp.Tx["TxnSignature"].(string)
+	if !ok {
+		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract TxnSignature from transaction")
+	}
+
 	baseTx = &transactions.BaseTx{
-		Account:            txResp.Tx["Account"].(types.Address),
-		Fee:                txResp.Tx["Fee"].(types.XRPCurrencyAmount),
-		Flags:              txResp.Tx["Flags"].(uint32),
-		LastLedgerSequence: txResp.Tx["LastLedgerSequence"].(uint32),
-		Sequence:           txResp.Tx["Sequence"].(uint32),
-		SigningPubKey:      txResp.Tx["SigningPubKey"].(string),
-		TransactionType:    transactions.TxType(txResp.Tx["TransactionType"].(string)),
-		TxnSignature:       txResp.Tx["TxnSignature"].(string),
+		Account:            types.Address(account),
+		Fee:                types.XRPCurrencyAmount(uint64(fee)),
+		Flags:              uint32(flags),
+		LastLedgerSequence: uint32(lastLedgerSeq),
+		Sequence:           uint32(sequence),
+		SigningPubKey:      signingPubKey,
+		TransactionType:    transactions.TxType(transactionType),
+		TxnSignature:       txnSignature,
 	}
 
 	return &txResp, meta, baseTx, nil
@@ -283,12 +468,12 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *wallet.Wallet, mpt MPToken) (txHas
 	tx.SetMPTCanTradeFlag()
 	tx.SetMPTCanTransferFlag()
 
-	hash, err := b.SubmitTx(w, tx)
+	hash, sequence, err := b.SubmitTxWithSequence(w, tx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to submit tx: %w", err)
 	}
 
-	issuanceID, err = mpt.CreateIssuanceID(string(w.ClassicAddress), tx.Sequence)
+	issuanceID, err = mpt.CreateIssuanceID(string(w.ClassicAddress), sequence)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
 	}

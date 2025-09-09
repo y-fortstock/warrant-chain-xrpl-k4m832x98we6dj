@@ -64,7 +64,8 @@ func (t *Token) CreateContract(ctx context.Context, req *tokenv1.CreateContractR
 func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*tokenv1.EmissionResponse, error) {
 	l := t.logger.With("method", "Emission",
 		"document_hash", req.GetDocumentHash(),
-		"warehouse_id", req.GetWarehouseAddressId())
+		"warehouse_id", req.GetWarehouseAddressId(),
+		"owner_address_id", req.GetOwnerAddressId())
 	l.Debug("start", "owner_address_id", req.GetOwnerAddressId())
 	t.bc.Lock()
 	defer t.bc.Unlock()

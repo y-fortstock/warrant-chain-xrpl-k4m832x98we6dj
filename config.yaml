@@ -1,6 +1,6 @@
 log:
   # level: debug | info | warn | error
-  level: info
+  level: debug
   # format: logfmt | json
   format: logfmt 
 network:
