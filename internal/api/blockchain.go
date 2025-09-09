@@ -100,6 +100,20 @@ func (b *Blockchain) GetBaseFeeAndReserve() (info servertypes.ClosedLedger, err 
 	return resp.Info.ValidatedLedger, nil
 }
 
+// GetMPTokenCount returns count of MPToken objects for an account.
+// Note: MPToken objects may be stored as different object types, so this method
+// gets all account objects and filters for MPToken-related ones.
+func (b *Blockchain) GetMPTokenCount(address string) (count int, err error) {
+	objects, err := b.c.GetAccountObjects(&account.ObjectsRequest{
+		Account: types.Address(address),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get account objects: %w", err)
+	}
+
+	return len(objects.AccountObjects), nil
+}
+
 // SubmitTx submits a transaction to the XRPL network using the provided wallet.
 // The function handles transaction signing, encoding, and submission to the network.
 //
