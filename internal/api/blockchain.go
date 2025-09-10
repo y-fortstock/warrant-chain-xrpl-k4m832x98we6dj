@@ -462,6 +462,31 @@ func (b *Blockchain) Payment(from *wallet.Wallet, to types.Address, amount uint6
 	return b.SubmitTx(from, payment)
 }
 
+// SubmitTransactionAndWait submits a transaction to the XRPL network and waits for it to be confirmed.
+//
+// Parameters:
+// - sender: The source wallet
+// - tx: The transaction to submit
+//
+// Returns the transaction hash if successful, or an error if the submission fails.
+func (b *Blockchain) SubmitTransactionAndWait(sender *wallet.Wallet, tx SubmittableTransaction) (hash string, err error) {
+	if sender == nil {
+		return "", fmt.Errorf("sender wallet cannot be nil")
+	}
+
+	txResponse, err := b.c.SubmitTxAndWait(tx.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   sender,
+		Autofill: true,
+		FailHard: false,
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to submit transaction: %w", err)
+	}
+
+	return txResponse.Hash.String(), nil
+}
+
 // MPTokenIssuanceCreate creates a new Multi-Purpose Token (MPT) on the XRPL network.
 // This function handles the creation of token metadata and submission of the issuance transaction.
 //
@@ -633,4 +658,270 @@ func (m MPToken) CreateIssuanceID(issuer string, sequence uint32) (string, error
 	}
 	accountIDHex := fmt.Sprintf("%X", accountID)
 	return fmt.Sprintf("%08X%s", sequence, accountIDHex), nil
+}
+
+// Accounts already preconfigured to hold RLUSD on Devnet
+const (
+	// RLUSD Issuer https://dev.bithomp.com/explorer/rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8
+	IssuerAddress = "rpBKbTPdestysw1jUkFxgcAH9pvxvWmzF8"
+	IssuerSeed    = "sEdTHw4jqyZjwFz6wvnFLbYtQU2rXpn"
+
+	// RLUSD Hex format for issued currency amount
+	RLUSDHex = "524C555344000000000000000000000000000000"
+)
+
+// Loan Flow
+
+// GetIssuerRLUSDWallet gets the pre-configured RLUSD issuer wallet on Devnet
+func GetIssuerRLUSDWallet() (wallet.Wallet, error) {
+	return wallet.FromSeed(IssuerSeed, "")
+}
+
+// CreateTrustline creates a trustline between an issuer and holder.
+// If issuer is nil, it will use the default RLUSD issuer wallet.
+func (b *Blockchain) CreateTrustline(issuer *wallet.Wallet, holder wallet.Wallet, trustSet transactions.TrustSet) (hash string, err error) {
+	_, errValidation := trustSet.Validate()
+	if errValidation != nil {
+		return "", fmt.Errorf("failed to validate trustset: %w", err)
+	}
+
+	// Use provided issuer or get default RLUSD issuer wallet on Devnet
+	var issuerWallet *wallet.Wallet
+	if issuer != nil {
+		issuerWallet = issuer
+	} else {
+		issuerRLUSD, err := GetIssuerRLUSDWallet()
+		if err != nil {
+			return "", fmt.Errorf("failed to get issuer wallet: %w", err)
+		}
+		issuerWallet = &issuerRLUSD
+	}
+
+	tx, err := b.c.SubmitTxAndWait(trustSet.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   issuerWallet,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create trustline: %w", err)
+	}
+
+	return tx.Hash.String(), nil
+}
+
+// Executes the Deployment step of the loan flow
+func (b *Blockchain) Deployment(borrower, lender wallet.Wallet, warrantMptIssuanceID string, mpt MPToken) (nil, err error) {
+	// Borrower mints MPT
+	_, issuanceID, err := b.MPTokenIssuanceCreate(&borrower, mpt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mint borrower MPT: %w", err)
+	}
+
+	// Lender authorizes MPT
+	_, err = b.AuthorizeMPToken(&lender, issuanceID)
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to authorize borrower MPT: %w", err)
+	}
+
+	// Borrower transfers MPT to lender
+	_, err = b.TransferMPToken(&borrower, issuanceID, lender.ClassicAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to transfer borrower MPT to lender: %w", err)
+	}
+
+	// Lender authorizes Warrant MPT
+	_, err = b.AuthorizeMPToken(&lender, warrantMptIssuanceID)
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to authorize warrant MPT: %w", err)
+	}
+
+	// Borrower transfers Warrant MPT to lender
+	_, err = b.TransferMPToken(&borrower, warrantMptIssuanceID, lender.ClassicAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("borrower failed to transfer warrant MPT to lender: %w", err)
+	}
+
+	// Lender distribues 1000000 RLUSD to borrower
+	payment := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			Account: lender.ClassicAddress,
+		},
+		Amount: types.IssuedCurrencyAmount{
+			Issuer:   IssuerAddress,
+			Currency: RLUSDHex,
+			Value:    "1000000",
+		},
+		Destination: borrower.ClassicAddress,
+	}
+	paymentTx, err := b.c.SubmitTxAndWait(payment.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &lender,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("lender failed to distribute RLUSD to borrower: %w", err)
+	}
+	fmt.Printf("#️⃣ Lender Distributes RLUSD To Borrower Hash: %+v\n", paymentTx.Hash)
+
+	return nil, nil
+}
+
+type RepayFullLoan struct {
+	Borrower             wallet.Wallet
+	Lender               wallet.Wallet
+	Warehouse            wallet.Wallet
+	LoanAmount           types.IssuedCurrencyAmount
+	WarrantMptIssuanceID string
+}
+
+// RepayFullLoan repays a full loan by sending RLUSD to the lender and burning the Debt MPT.
+// It also returns the warrant MPT to the borrower and the warehouse.
+//
+// Parameters:
+// - borrower: The borrower's wallet
+// - lender: The lender's wallet
+// - warehouse: The warehouse's wallet
+// - loanAmount: The amount of RLUSD to repay
+// - warrantMptIssuanceID: The issuance ID of the warrant MPT
+//
+// Returns an error if the repayment fails.
+func (b *Blockchain) RepayFullLoan(rfl RepayFullLoan) (err error) {
+	// Borrower repays full loan as payment RLUSD to lender
+	payment := &transactions.Payment{
+		BaseTx: transactions.BaseTx{
+			Account: rfl.Borrower.ClassicAddress,
+		},
+		Destination: rfl.Lender.ClassicAddress,
+		Amount:      rfl.LoanAmount,
+	}
+	paymentTx, err := b.c.SubmitTxAndWait(payment.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &rfl.Borrower,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return fmt.Errorf("borrower failed to repay full loan: %w", err)
+	}
+	fmt.Printf("#️⃣ Borrower Repays Full Loan RLUSD Payment Hash: %+v\n", paymentTx.Hash)
+
+	// Borrower burns Debt MPT
+	burnMPT := &transactions.MPTokenIssuanceDestroy{
+		BaseTx: transactions.BaseTx{
+			Account: rfl.Lender.ClassicAddress,
+		},
+		MPTokenIssuanceID: rfl.WarrantMptIssuanceID,
+	}
+
+	burnMPTTx, err := b.c.SubmitTxAndWait(burnMPT.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &rfl.Borrower,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return fmt.Errorf("borrower failed to burn Debt MPT: %w", err)
+	}
+	fmt.Printf("#️⃣ Borrower Burns Debt MPT Hash: %+v\n", burnMPTTx.Hash)
+
+	// Lender return warrant MPT to borrower
+	returnWarrantMPTTxHash, err := b.TransferMPToken(&rfl.Lender, rfl.WarrantMptIssuanceID, rfl.Borrower.ClassicAddress.String())
+	if err != nil {
+		return fmt.Errorf("lender failed to return warrant MPT to borrower: %w", err)
+	}
+	fmt.Printf("#️⃣ Lender Returns Warrant MPT To Borrower Hash: %+v\n", returnWarrantMPTTxHash)
+
+	// Borrower returns warrant MPT to warehouse
+	returnWarrantMPTtoBorrowerTxHash, err := b.TransferMPToken(&rfl.Borrower, rfl.WarrantMptIssuanceID, rfl.Warehouse.ClassicAddress.String())
+	if err != nil {
+		return fmt.Errorf("borrower failed to return warrant MPT to warehouse: %w", err)
+	}
+	fmt.Printf("#️⃣ Borrower Returns Warrant MPT To Warehouse Hash: %+v\n", returnWarrantMPTtoBorrowerTxHash)
+
+	// Warehouse burns warrant MPT
+	burnWarrantMPT := &transactions.MPTokenIssuanceDestroy{
+		BaseTx: transactions.BaseTx{
+			Account: rfl.Warehouse.ClassicAddress,
+		},
+		MPTokenIssuanceID: rfl.WarrantMptIssuanceID,
+	}
+
+	burnWarrantMPTTx, err := b.c.SubmitTxAndWait(burnWarrantMPT.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &rfl.Warehouse,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return fmt.Errorf("warehouse failed to burn warrant MPT: %w", err)
+	}
+	fmt.Printf("#️⃣ Warehouse Burns Warrant MPT Hash: %+v\n", burnWarrantMPTTx.Hash)
+
+	return nil
+}
+
+type DefaultRepayFullLoan struct {
+	Borrower             wallet.Wallet
+	Lender               wallet.Wallet
+	Warehouse            wallet.Wallet
+	LoanAmount           types.IssuedCurrencyAmount
+	DebtMptIssuanceID    string
+	WarrantMptIssuanceID string
+}
+
+// DefaultRepayFullLoan executes the step in the case the loan can't be repaid on time.
+// It returns the warrant MPT to the warehouse and burns the Debt MPT.
+//
+// Parameters:
+// - dfl: The DefaultRepayFullLoan struct containing the necessary information
+//
+// Returns an error if the repayment fails.
+func (b *Blockchain) DefaultRepayFullLoan(dfl DefaultRepayFullLoan) (err error) {
+	// Lender returns Debt MPT to borrower
+	returnDebtMPTTxHash, err := b.TransferMPToken(&dfl.Lender, dfl.DebtMptIssuanceID, dfl.Borrower.ClassicAddress.String())
+	if err != nil {
+		return fmt.Errorf("lender failed to return debt MPT to borrower: %w", err)
+	}
+	fmt.Printf("#️⃣ Return Debt MPT Hash: %+v\n", returnDebtMPTTxHash)
+
+	// Borrower burns Debt MPT
+	burnDebtMPT := &transactions.MPTokenIssuanceDestroy{
+		BaseTx: transactions.BaseTx{
+			Account: dfl.Borrower.ClassicAddress,
+		},
+		MPTokenIssuanceID: dfl.DebtMptIssuanceID,
+	}
+
+	burnDebtMPTTx, err := b.c.SubmitTxAndWait(burnDebtMPT.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &dfl.Borrower,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return fmt.Errorf("borrower failed to burn Debt MPT: %w", err)
+	}
+	fmt.Printf("#️⃣ Burn Debt MPT Hash: %+v\n", burnDebtMPTTx.Hash)
+
+	// Lender returns warrant MPT to warehouse
+	returnWarrantMPTTxHash, err := b.TransferMPToken(&dfl.Lender, dfl.WarrantMptIssuanceID, dfl.Warehouse.ClassicAddress.String())
+	if err != nil {
+		return fmt.Errorf("lender failed to return warrant MPT to warehouse: %w", err)
+	}
+	fmt.Printf("#️⃣ Return Warrant MPT Hash: %+v\n", returnWarrantMPTTxHash)
+
+	// Warehouse burns warrant MPT
+	burnWarrantMPT := transactions.MPTokenIssuanceDestroy{
+		BaseTx: transactions.BaseTx{
+			Account: dfl.Warehouse.ClassicAddress,
+		},
+		MPTokenIssuanceID: dfl.WarrantMptIssuanceID,
+	}
+	burnWarrantMPTTx, err := b.c.SubmitTxAndWait(burnWarrantMPT.Flatten(), &rpctypes.SubmitOptions{
+		Wallet:   &dfl.Warehouse,
+		Autofill: true,
+		FailHard: false,
+	})
+	if err != nil {
+		return fmt.Errorf("warehouse failed to burn warrant MPT: %w", err)
+	}
+	fmt.Printf("#️⃣ Burn Warrant MPT Hash: %+v\n", burnWarrantMPTTx.Hash)
+
+	return
 }
