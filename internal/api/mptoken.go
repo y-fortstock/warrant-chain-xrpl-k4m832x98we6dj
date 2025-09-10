@@ -8,10 +8,6 @@ import (
 	addresscodec "github.com/Peersyst/xrpl-go/address-codec"
 )
 
-type MPToken interface {
-	CreateMetadata() (MPTokenMetadata, error)
-}
-
 // MPToken represents a Multi-Purpose Token with associated metadata.
 // It contains document hash and signature information for asset-backed tokens.
 type WarrantMPToken struct {

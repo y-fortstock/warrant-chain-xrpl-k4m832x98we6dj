@@ -140,8 +140,20 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 		l.Error("failed to get base fee and reserve", "error", err)
 		return nil, err
 	}
+
+	mptCnt, err := a.bc.GetMPTokenCount(req.GetAccountId())
+	if err != nil {
+		l.Error("failed to get mp token count", "error", err)
+		return nil, err
+	}
+
 	fee := uint64(srvInfo.BaseFeeXRP * xrpToDrops * 120 / 100) // 20% margin
-	reserve := uint64((srvInfo.ReserveBaseXRP + srvInfo.ReserveIncXRP) * xrpToDrops)
+	reserve := uint64((srvInfo.ReserveBaseXRP + srvInfo.ReserveIncXRP*float32(mptCnt)) * xrpToDrops)
+	l.Debug("reserves",
+		"count", mptCnt,
+		"baseReserve", srvInfo.ReserveBaseXRP,
+		"incReserve", srvInfo.ReserveIncXRP,
+	)
 
 	if balance <= (fee + reserve) {
 		l.Warn("account balance is less or equal than fee + reserve", "balance", balance, "fee", fee, "reserve", reserve)

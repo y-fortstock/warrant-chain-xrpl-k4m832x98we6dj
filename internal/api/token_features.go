@@ -66,8 +66,8 @@ func (l *Loans) RemoveLoan(tokenID string) {
 func (l *Loans) processLoans() {
 	for {
 		for tokenID, loan := range l.loans {
-			if loan.LoanNextPaymentDate.Before(time.Now()) {
-				loan.LoanNextPaymentDate = loan.LoanNextPaymentDate.Add(loan.LoanPeriod)
+			if loan.NextPaymentDate.Before(time.Now()) {
+				loan.NextPaymentDate = loan.NextPaymentDate.Add(loan.Period)
 				l.processLoan(tokenID, loan)
 			}
 		}

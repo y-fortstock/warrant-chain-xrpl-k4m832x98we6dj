@@ -72,7 +72,8 @@ func (t *Token) CreateContract(ctx context.Context, req *tokenv1.CreateContractR
 func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*tokenv1.EmissionResponse, error) {
 	l := t.logger.With("method", "Emission",
 		"document_hash", req.GetDocumentHash(),
-		"warehouse_id", req.GetWarehouseAddressId())
+		"warehouse_id", req.GetWarehouseAddressId(),
+		"owner_address_id", req.GetOwnerAddressId())
 	l.Debug("start", "owner_address_id", req.GetOwnerAddressId())
 	t.bc.Lock()
 	defer t.bc.Unlock()
@@ -110,11 +111,13 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 		return nil, status.Errorf(codes.Internal, "failed to create issuance: %v", err)
 	}
 
-	for {
+	for i := 0; i < 5; i++ {
 		time.Sleep(4 * time.Second)
 		_, meta, _, err := t.bc.GetTransactionInfo(hash)
 		if err != nil {
-			l.Error("failed to get transaction info", "error", err)
+			l.Warn("failed to get transaction info",
+				"hash", hash,
+				"error", err)
 		}
 		if strings.Contains(meta.TransactionResult, "SUCCESS") {
 			break
