@@ -36,7 +36,7 @@ func NewToken(logger *slog.Logger, bc *Blockchain) *Token {
 		logger:   logger,
 		bc:       bc,
 		features: &config.FeatureConfig{Loan: false},
-		loans:    NewLoans(),
+		loans:    NewLoans(logger, bc),
 	}
 }
 

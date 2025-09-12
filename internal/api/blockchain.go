@@ -224,6 +224,37 @@ func (b *Blockchain) SubmitTxWithSequence(w *wallet.Wallet, tx SubmittableTransa
 	return hash, sequence, nil
 }
 
+func (b *Blockchain) SubmitTxAndWait(w *wallet.Wallet, tx SubmittableTransaction) (
+	hash string, err error) {
+	if w == nil {
+		return "", fmt.Errorf("wallet cannot be nil")
+	}
+	if tx == nil {
+		return "", fmt.Errorf("transaction cannot be nil")
+	}
+
+	// Access BaseTx fields directly since all transaction types embed BaseTx
+	flattenedTx := tx.Flatten()
+	flattenedTx["Account"] = w.ClassicAddress.String()
+	flattenedTx["SigningPubKey"] = w.PublicKey
+
+	resp, err := b.c.SubmitTxAndWait(flattenedTx, &rpctypes.SubmitOptions{
+		Autofill: true,
+		FailHard: false,
+		Wallet:   w,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to submit tx: %w", err)
+	}
+
+	hash = resp.Tx["hash"].(string)
+	if hash == "" {
+		return "", fmt.Errorf("hash is empty")
+	}
+
+	return hash, nil
+}
+
 // GetAccountInfo retrieves detailed information about an XRPL account.
 // This includes the account's balance, sequence number, and other account-specific data.
 //
@@ -432,8 +463,8 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 // - amount: The amount to transfer in drops
 //
 // Returns the transaction hash if successful, or an error if the transfer fails.
-func (b *Blockchain) PaymentFromSystemAccount(to string, amount uint64) (hash string, err error) {
-	return b.Payment(b.w, types.Address(to), amount)
+func (b *Blockchain) PaymentXRPFromSystemAccount(to string, amount uint64) (hash string, err error) {
+	return b.PaymentXRP(b.w, types.Address(to), amount)
 }
 
 // PaymentToSystemAccount transfers XRP from the specified source wallet to the system account.
@@ -444,8 +475,8 @@ func (b *Blockchain) PaymentFromSystemAccount(to string, amount uint64) (hash st
 // - amount: The amount to transfer in drops
 //
 // Returns the transaction hash if successful, or an error if the transfer fails.
-func (b *Blockchain) PaymentToSystemAccount(from *wallet.Wallet, amount uint64) (hash string, err error) {
-	return b.Payment(from, b.w.ClassicAddress, amount)
+func (b *Blockchain) PaymentXRPToSystemAccount(from *wallet.Wallet, amount uint64) (hash string, err error) {
+	return b.PaymentXRP(from, b.w.ClassicAddress, amount)
 }
 
 // Payment executes a payment transaction between two accounts.
@@ -457,7 +488,7 @@ func (b *Blockchain) PaymentToSystemAccount(from *wallet.Wallet, amount uint64) 
 // - amount: The amount to transfer in drops
 //
 // Returns the transaction hash if successful, or an error if the payment fails.
-func (b *Blockchain) Payment(from *wallet.Wallet, to types.Address, amount uint64) (txHash string, err error) {
+func (b *Blockchain) PaymentXRP(from *wallet.Wallet, to types.Address, amount uint64) (txHash string, err error) {
 	payment := &transactions.Payment{
 		Amount:      types.XRPCurrencyAmount(amount),
 		Destination: to,
@@ -470,11 +501,11 @@ func (b *Blockchain) Payment(from *wallet.Wallet, to types.Address, amount uint6
 // This function handles the creation of token metadata and submission of the issuance transaction.
 //
 // Parameters:
-// - w: The wallet that will own the token
+// - issuer: The wallet that will own the token
 // - mpt: The MPToken containing document hash and signature information
 //
 // Returns the transaction hash and issuance ID if successful, or an error if creation fails.
-func (b *Blockchain) MPTokenIssuanceCreate(w *wallet.Wallet, mpt MPToken) (txHash, issuanceID string, err error) {
+func (b *Blockchain) MPTokenIssuanceCreate(issuer *wallet.Wallet, mpt MPToken) (txHash, issuanceID string, err error) {
 	md, err := mpt.CreateMetadata()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create metadata: %w", err)
@@ -495,17 +526,25 @@ func (b *Blockchain) MPTokenIssuanceCreate(w *wallet.Wallet, mpt MPToken) (txHas
 	tx.SetMPTCanTradeFlag()
 	tx.SetMPTCanTransferFlag()
 
-	hash, sequence, err := b.SubmitTxWithSequence(w, tx)
+	hash, sequence, err := b.SubmitTxWithSequence(issuer, tx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to submit tx: %w", err)
 	}
 
-	issuanceID, err = CreateIssuanceID(string(w.ClassicAddress), sequence)
+	issuanceID, err = CreateIssuanceID(string(issuer.ClassicAddress), sequence)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
 	}
 
 	return hash, issuanceID, nil
+}
+
+func (b *Blockchain) MPTokenIssuanceDestroy(holder *wallet.Wallet, issuanceId string) (txHash string, err error) {
+	tx := &transactions.MPTokenIssuanceDestroy{
+		MPTokenIssuanceID: issuanceId,
+	}
+
+	return b.SubmitTxAndWait(holder, tx)
 }
 
 // AuthorizeMPToken authorizes an MPT for use by the specified wallet.
@@ -521,7 +560,7 @@ func (b *Blockchain) AuthorizeMPToken(w *wallet.Wallet, issuanceId string) (txHa
 		MPTokenIssuanceID: issuanceId,
 	}
 
-	return b.SubmitTx(w, tx)
+	return b.SubmitTxAndWait(w, tx)
 }
 
 // TransferMPToken transfers an MPT from one account to another.

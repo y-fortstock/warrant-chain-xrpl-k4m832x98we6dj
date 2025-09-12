@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	addresscodec "github.com/Peersyst/xrpl-go/address-codec"
@@ -75,7 +76,7 @@ func (m WarrantMPToken) CreateMetadata() (MPTokenMetadata, error) {
 type DebtMPToken struct {
 	Currency          string
 	Amount            uint64
-	InterestRate      uint64
+	InterestRate      float64
 	Period            time.Duration
 	CollateralTokenID string
 	OwnerAddress      string
@@ -85,8 +86,8 @@ type DebtMPToken struct {
 func NewDebtMPToken(collateralTokenID string, ownerAddress string, creditorAddress string) DebtMPToken {
 	return DebtMPToken{
 		Currency:          LoanCurrency,
-		Amount:            LoanAmount,
-		InterestRate:      LoanInterestRate,
+		Amount:            uint64(LoanAmount),
+		InterestRate:      float64(LoanInterestRate),
 		Period:            LoanPeriod,
 		CollateralTokenID: collateralTokenID,
 		OwnerAddress:      ownerAddress,
@@ -95,7 +96,50 @@ func NewDebtMPToken(collateralTokenID string, ownerAddress string, creditorAddre
 }
 
 func (d DebtMPToken) CreateMetadata() (MPTokenMetadata, error) {
-	return MPTokenMetadata{}, nil
+	addInfo, err := json.Marshal(map[string]string{
+		"currency":             d.Currency,
+		"notional":             strconv.FormatUint(d.Amount, 10),
+		"apr_percent":          strconv.FormatFloat(d.InterestRate, 'f', -1, 64),
+		"term_days":            strconv.FormatInt(int64(d.Period.Hours()/24), 10),
+		"servicing":            "daily",
+		"rate_percent_per_day": strconv.FormatFloat(d.InterestRate/365, 'f', -1, 64),
+		"origination_ts":       time.Now().Format(time.RFC3339),
+		"maturity_ts":          time.Now().Add(d.Period).Format(time.RFC3339),
+		"borrower_account":     d.OwnerAddress,
+		"lender_account":       d.CreditorAddress,
+		"warrant_token_id":     d.CollateralTokenID,
+		"warrant_ticker":       "FSWRNT",
+	})
+	if err != nil {
+		return MPTokenMetadata{}, fmt.Errorf("failed to marshal additional info: %w", err)
+	}
+
+	return MPTokenMetadata{
+		Ticker:        "FSDEBT",
+		Name:          "FortStock Debt Token",
+		Icon:          "https://cdn.fortstock.io/app/fortstock.png",
+		AssetClass:    "rwa",
+		AssetSubclass: "credit",
+		IssuerName:    d.OwnerAddress,
+		Urls: []MPTokenMetadataUrl{
+			{
+				Url:   "https://fortstock.io",
+				Type:  "website",
+				Title: "Home",
+			},
+			{
+				Url:   "https://fortstock.io/rulebook/",
+				Type:  "document",
+				Title: "Rulebook",
+			},
+			{
+				Url:   "https://fortstock.io/terms/<contract_id>.pdf",
+				Type:  "document",
+				Title: "Loan Agreement",
+			},
+		},
+		AdditionalInfo: addInfo,
+	}, nil
 }
 
 // CreateIssuanceID generates a unique issuance ID for the token.

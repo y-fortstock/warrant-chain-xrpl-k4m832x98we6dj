@@ -3,10 +3,12 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/Peersyst/xrpl-go/xrpl/wallet"
+	"github.com/shopspring/decimal"
 	"gitlab.com/warrant1/warrant/chain-xrpl/internal/crypto"
 	tokenv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/token/v1"
 	typesv1 "gitlab.com/warrant1/warrant/protobuf/blockchain/types/v1"
@@ -14,42 +16,42 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	LoanAmount       = 1000000 * 100
-	LoanCurrency     = "RLUSD"
-	LoanInterestRate = 3650
-	LoanPeriod       = 10 * time.Minute
-)
-
 type Loan struct {
-	Amount          uint64 // in Currency * 100
-	InterestRate    uint64 // in % * 100
-	Period          time.Duration
-	NextPaymentDate time.Time
-	OwnerWallet     *wallet.Wallet
-	CreditorWallet  *wallet.Wallet
-	Currency        string
+	Principal          decimal.Decimal
+	AnnualInterestRate decimal.Decimal
+	Period             time.Duration
+	NextPaymentDate    time.Time
+	OwnerWallet        *wallet.Wallet
+	CreditorWallet     *wallet.Wallet
+	Currency           string
+	DebtTokenID        string
 	// LoanEndDate         time.Time
 }
 
 func NewLoan(ownerWallet *wallet.Wallet, creditorWallet *wallet.Wallet) Loan {
 	return Loan{
-		Amount:          LoanAmount,
-		Currency:        LoanCurrency,
-		InterestRate:    LoanInterestRate,
-		Period:          LoanPeriod,
-		NextPaymentDate: time.Now().Add(LoanPeriod),
-		OwnerWallet:     ownerWallet,
-		CreditorWallet:  creditorWallet,
+		Principal:          decimal.NewFromInt(LoanAmount),
+		AnnualInterestRate: decimal.NewFromFloat(LoanInterestRate),
+		Period:             LoanPeriod,
+		NextPaymentDate:    time.Now().Add(LoanPeriod),
+		OwnerWallet:        ownerWallet,
+		CreditorWallet:     creditorWallet,
+		Currency:           LoanCurrency,
 	}
 }
 
-type Loans struct {
-	loans map[string]Loan
+func (l *Loan) SetDebtTokenID(debtTokenID string) {
+	l.DebtTokenID = debtTokenID
 }
 
-func NewLoans() *Loans {
-	l := &Loans{loans: make(map[string]Loan)}
+type Loans struct {
+	loans  map[string]Loan
+	bc     *Blockchain
+	logger *slog.Logger
+}
+
+func NewLoans(logger *slog.Logger, bc *Blockchain) *Loans {
+	l := &Loans{loans: make(map[string]Loan), logger: logger.With("method", "Loans"), bc: bc}
 	go l.processLoans()
 
 	return l
@@ -59,28 +61,57 @@ func (l *Loans) AddLoan(tokenID string, loan Loan) {
 	l.loans[tokenID] = loan
 }
 
+func (l *Loans) GetLoan(tokenID string) (Loan, error) {
+	loan, ok := l.loans[tokenID]
+	if !ok {
+		return Loan{}, fmt.Errorf("loan not found")
+	}
+	return loan, nil
+}
+
 func (l *Loans) RemoveLoan(tokenID string) {
 	delete(l.loans, tokenID)
 }
 
 func (l *Loans) processLoans() {
 	for {
+		l.logger.Debug("processing loans")
 		for tokenID, loan := range l.loans {
 			if loan.NextPaymentDate.Before(time.Now()) {
 				loan.NextPaymentDate = loan.NextPaymentDate.Add(loan.Period)
-				l.processLoan(tokenID, loan)
+				l.logger.Debug("processing loan",
+					"token_id", tokenID,
+					"next_payment_date", loan.NextPaymentDate,
+					"principal", loan.Principal,
+					"annual_interest_rate", loan.AnnualInterestRate,
+					"period", loan.Period,
+					"owner_wallet", loan.OwnerWallet.ClassicAddress.String(),
+					"creditor_wallet", loan.CreditorWallet.ClassicAddress.String(),
+					"currency", loan.Currency,
+				)
+				err := l.processLoan(tokenID, loan)
+				if err != nil {
+					l.logger.Error("failed to process loan", "error", err)
+				}
 			}
 		}
-		time.Sleep(10 * time.Minute)
+		time.Sleep(time.Minute)
 	}
 }
 
-func (l *Loans) processLoan(tokenID string, loan Loan) {
-	// TODO: implement Interest Tracking here
-	// TODO: implement Interest Tracking here
-	// TODO: implement Interest Tracking here
+func (l *Loans) processLoan(tokenID string, loan Loan) error {
+	l.bc.Lock()
+	defer l.bc.Unlock()
 
-	// Owner/Borrower sends payment of RLUSD to Creditor/Lender with interest term
+	dailyRate := loan.AnnualInterestRate.Div(decimal.NewFromInt(100)).Div(decimal.NewFromInt(365))
+	interest := loan.Principal.Mul(dailyRate)
+
+	hash, err := l.bc.PaymentRLUSD(loan.OwnerWallet, loan.CreditorWallet, interest.InexactFloat64())
+	if err != nil {
+		return fmt.Errorf("failed to payment RLUSD: %v", err)
+	}
+	l.logger.Debug("processed loan", "token_id", tokenID, "hash", hash)
+	return nil
 }
 
 func (t *Token) transferToCreditor(ctx context.Context, req *tokenv1.TransferToCreditorRequest) (*tokenv1.TransferToCreditorResponse, error) {
@@ -176,38 +207,96 @@ func (t *Token) transferToCreditorWithLoan(ctx context.Context, req *tokenv1.Tra
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	// TODO: implement Deployment of loan here
-	// TODO: implement Deployment of loan here
-	// TODO: implement Deployment of loan here
+	l.Debug("setup initial balances for parties")
+	loan := NewLoan(owner, creditor)
 
-	// REPLENISH Owner/Borrower Account with RLUSD (sum of loan interest) from System Account
-	// REPLENISH Creditor/Lender Account with RLUSD (loan body) from System Account
-	// Owner/Borrower mints Debt Token (with constants in loan terms)
-	// Creditor/Lender authorize Debt Token
-	// Transfer Debt Token from Owner/Borrower to Creditor/Lender (Creditor/Lender will have 2 tokens Debt and Warrant)
-	// Creditor/Lender sends payment of RLUSD to Owner/Borrower with loan term
-	// Starting cyclic process of getting interests
-
-	l.Debug("authorizing token")
-	hash, err := t.bc.AuthorizeMPToken(creditor, req.GetTokenId())
+	_, err = t.bc.CreateTrustlineFromSystemAccount(owner, loan.Principal.InexactFloat64()/10)
 	if err != nil {
-		l.Warn("failed to authorize token", "error", err)
+		l.Error("failed to create trustline", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to create trustline: %v", err)
 	}
-	l.Debug("authorized token", "hash", hash)
 
-	l.Debug("transferring token to creditor")
-	hash, err = t.bc.TransferMPToken(owner, req.GetTokenId(), creditor.ClassicAddress.String())
+	_, err = t.bc.CreateTrustlineFromSystemAccount(creditor, loan.Principal.InexactFloat64())
 	if err != nil {
-		l.Error("failed to transfer token", "error", err)
+		l.Error("failed to create trustline", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to create trustline: %v", err)
+	}
+
+	l.Debug("repelling RLUSD (sum of loan interest) from System Account to owner/borrower")
+	_, err = t.bc.PaymentRLUSDFromSystemAccount(owner, loan.Principal.InexactFloat64()/10)
+	if err != nil {
+		l.Error("failed to payment RLUSD from system account", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
+	}
+
+	l.Debug("repelling RLUSD (loan body) from System Account to creditor/lender")
+	_, err = t.bc.PaymentRLUSDFromSystemAccount(creditor, loan.Principal.InexactFloat64())
+	if err != nil {
+		l.Error("failed to payment RLUSD from system account", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
+	}
+
+	l.Debug("minting debt token")
+	debtToken := NewDebtMPToken(req.GetTokenId(), owner.ClassicAddress.String(), creditor.ClassicAddress.String())
+	hash, issuanceID, err := t.bc.MPTokenIssuanceCreate(owner, debtToken)
+	if err != nil {
+		l.Error("failed to mint debt token", "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to mint debt token: %v", err)
+	}
+	loan.SetDebtTokenID(issuanceID)
+
+	l = l.With("debt_token_id", issuanceID)
+	l.Debug("creditor/lender authorizing debt token")
+	hash, err = t.bc.AuthorizeMPToken(creditor, issuanceID)
+	if err != nil {
+		l.Warn("failed to authorize debt token", "hash", hash, "error", err)
+	}
+
+	l.Debug("transferring debt token to creditor")
+	hash, err = t.bc.TransferMPToken(owner, issuanceID, creditor.ClassicAddress.String())
+	if err != nil {
+		l.Error("failed to transfer debt token", "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to transfer debt token: %v", err)
+	}
+
+	l.Debug("transferring warrant token to creditor")
+	hash, err = t.bc.AuthorizeMPToken(creditor, req.GetTokenId())
+	if err != nil {
+		l.Warn("failed to authorize warrant token", "hash", hash, "error", err)
+	}
+
+	mptHash, err := t.bc.TransferMPToken(owner, req.GetTokenId(), creditor.ClassicAddress.String())
+	if err != nil {
+		l.Error("failed to transfer token", "hash", hash, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
 	}
+
+	l.Debug("creditor/lender sending payment of RLUSD to owner/borrower with loan term",
+		"amount", LoanAmount,
+		"interest_rate", LoanInterestRate,
+		"period", LoanPeriod,
+	)
+	// hash, err = t.bc.CreateTrustline(creditor, owner, LoanAmount)
+	// if err != nil {
+	// 	l.Error("failed to create trustline", "hash", hash, "error", err)
+	// 	return nil, status.Errorf(codes.Internal, "failed to create trustline: %v", err)
+	// }
+
+	hash, err = t.bc.PaymentRLUSD(creditor, owner, loan.Principal.InexactFloat64())
+	if err != nil {
+		l.Error("failed to payment RLUSD", "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD: %v", err)
+	}
+
+	l.Debug("add loan to interests tracking")
+	t.loans.AddLoan(issuanceID, loan)
 
 	return &tokenv1.TransferToCreditorResponse{
 		Error: nil,
 		Token: &tokenv1.Token{
 			Id: req.GetDocumentHash(),
 			Transaction: &typesv1.Transaction{
-				Id:        hash,
+				Id:        mptHash,
 				BlockTime: uint64(time.Now().Unix()),
 				IsSuccess: true,
 			},
@@ -273,11 +362,12 @@ func (t *Token) buyoutFromCreditor(ctx context.Context, req *tokenv1.BuyoutFromC
 }
 
 func (t *Token) buyoutFromCreditorWithLoan(ctx context.Context, req *tokenv1.BuyoutFromCreditorRequest) (*tokenv1.BuyoutFromCreditorResponse, error) {
+	tokenID := req.GetTokenId()
 	l := t.logger.With("method", "BuyoutFromCreditorWithLoan",
 		"document_hash", req.GetDocumentHash(),
 		"creditor_address_id", req.GetCreditorAddressId(),
 		"owner_address_id", req.GetOwnerAddressId(),
-		"token_id", req.GetTokenId(),
+		"token_id", tokenID,
 	)
 	l.Debug("start")
 	t.bc.Lock()
@@ -305,23 +395,40 @@ func (t *Token) buyoutFromCreditorWithLoan(ctx context.Context, req *tokenv1.Buy
 		return nil, status.Errorf(codes.InvalidArgument, "owner address does not match")
 	}
 
-	// TODO: implement Loan Repayment here
-	// TODO: implement Loan Repayment here
-	// TODO: implement Loan Repayment here
-
-	// Owner/Borrower sends payment of RLUSD with body of loan (or rest body of loan - there is no implementation reducing body of loan for now) to Creditor/Lender
-	// Transfer Debt Token back from Creditor/Lender to Owner/Borrower
-	// Stops instance of Interest Tracking for this Debt Token (by apt_issuance_id)
-	// Burn Debt Token by Owner/Borrower
-
-	_, err = t.bc.AuthorizeMPToken(owner, req.GetTokenId())
+	l.Debug("returning loan body to creditor/lender")
+	loan, err := t.loans.GetLoan(tokenID)
 	if err != nil {
-		l.Warn("failed to authorize token", "error", err)
+		l.Error("failed to get loan", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to get loan: %v", err)
+	}
+	hash, err := t.bc.PaymentRLUSD(owner, creditor, loan.Principal.InexactFloat64())
+	if err != nil {
+		l.Error("failed to payment RLUSD", "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD: %v", err)
 	}
 
-	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), owner.ClassicAddress.String())
+	l.Debug("returning and burning debt token to owner/borrower")
+	hash, err = t.bc.TransferMPToken(creditor, loan.DebtTokenID, owner.ClassicAddress.String())
 	if err != nil {
-		l.Error("failed to transfer token", "error", err)
+		l.Error("failed to transfer token", "debt_token_id", loan.DebtTokenID, "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
+	}
+	t.loans.RemoveLoan(tokenID)
+	hash, err = t.bc.MPTokenIssuanceDestroy(owner, loan.DebtTokenID)
+	if err != nil {
+		l.Error("failed to destroy debt token", "debt_token_id", loan.DebtTokenID, "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to destroy debt token: %v", err)
+	}
+
+	l.Debug("returning warrant token to owner/borrower")
+	hash, err = t.bc.AuthorizeMPToken(owner, tokenID)
+	if err != nil {
+		l.Warn("failed to authorize token", "hash", hash, "error", err)
+	}
+
+	hash, err = t.bc.TransferMPToken(creditor, tokenID, owner.ClassicAddress.String())
+	if err != nil {
+		l.Error("failed to transfer token", "hash", hash, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
 	}
 
@@ -385,10 +492,11 @@ func (t *Token) transferFromCreditorToWarehouse(ctx context.Context, req *tokenv
 }
 
 func (t *Token) transferFromCreditorToWarehouseWithLoan(ctx context.Context, req *tokenv1.TransferFromCreditorToWarehouseRequest) (*tokenv1.TransferFromCreditorToWarehouseResponse, error) {
+	tokenID := req.GetTokenId()
 	l := t.logger.With("method", "TransferFromOwnerToWarehouseWithLoan",
 		"document_hash", req.GetDocumentHash(),
 		"creditor_address_id", req.GetCreditorAddressId(),
-		"token_id", req.GetTokenId(),
+		"token_id", tokenID,
 	)
 	l.Debug("start")
 	t.bc.Lock()
@@ -405,23 +513,36 @@ func (t *Token) transferFromCreditorToWarehouseWithLoan(ctx context.Context, req
 		return nil, status.Errorf(codes.InvalidArgument, "creditor address does not match")
 	}
 
-	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(req.GetTokenId())
+	l.Debug("returning and burning debt token to owner/borrower")
+	loan, err := t.loans.GetLoan(tokenID)
+	if err != nil {
+		l.Error("failed to get loan", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to get loan: %v", err)
+	}
+
+	hash, err := t.bc.TransferMPToken(creditor, loan.DebtTokenID, loan.OwnerWallet.ClassicAddress.String())
+	if err != nil {
+		l.Error("failed to transfer token", "debt_token_id", loan.DebtTokenID, "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
+	}
+	t.loans.RemoveLoan(tokenID)
+
+	hash, err = t.bc.MPTokenIssuanceDestroy(loan.OwnerWallet, loan.DebtTokenID)
+	if err != nil {
+		l.Error("failed to destroy debt token", "debt_token_id", loan.DebtTokenID, "hash", hash, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to destroy debt token: %v", err)
+	}
+
+	l.Debug("returning warrant token to warehouse")
+	issuerAddr, err := t.bc.GetIssuerAddressFromIssuanceID(tokenID)
 	if err != nil {
 		l.Error("failed to get issuer address", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to get issuer address: %v", err)
 	}
 
-	// TODO: implement Default here
-	// TODO: implement Default here
-	// TODO: implement Default here
-
-	// Transfer Debt Token back from Creditor/Lender to Owner/Borrower
-	// Stops instance of Interest Tracking for this Debt Token (by apt_issuance_id)
-	// Burn Debt Token by Owner/Borrower
-
-	hash, err := t.bc.TransferMPToken(creditor, req.GetTokenId(), issuerAddr)
+	hash, err = t.bc.TransferMPToken(creditor, tokenID, issuerAddr)
 	if err != nil {
-		l.Error("failed to transfer token", "error", err)
+		l.Error("failed to transfer token", "hash", hash, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
 	}
 
