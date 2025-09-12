@@ -65,7 +65,7 @@ var rootCmd = &cobra.Command{
 		}
 		fmt.Println(cfg.RedactedConfigLog())
 
-		server := di.InitializeServer(cfg.LoggerConfig(), cfg.NetworkConfig())
+		server := di.InitializeServer(cfg.LoggerConfig(), cfg.NetworkConfig(), cfg.FeatureConfig())
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		if err := server.RunWithGracefulShutdown(ctx, cfg.Server.Listen); err != nil {

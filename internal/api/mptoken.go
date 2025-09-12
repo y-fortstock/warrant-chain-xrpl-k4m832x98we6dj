@@ -60,19 +60,6 @@ func (m WarrantMPToken) CreateMetadata() (MPTokenMetadata, error) {
 	}, nil
 }
 
-// Currency: RLUSD
-// Loan amount: 1,000,000 RLUSD
-// Term: 3 days
-// Annual rate: 36.5%
-// Servicing cadence: daily payment 0.1% (executed per schedule defined in Debt token metadata)
-
-// loan_id,
-// amount,
-// currency,
-// due_date
-// collateral_token_id = Warrant Token ID
-// borrower and lender addresses
-
 type DebtMPToken struct {
 	Currency          string
 	Amount            uint64

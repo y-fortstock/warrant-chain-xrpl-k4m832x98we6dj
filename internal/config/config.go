@@ -113,8 +113,8 @@ func (c *Config) NetworkConfig() NetworkConfig {
 // This method provides access to feature configuration in a structured format.
 //
 // Returns the FeatureConfig section of the main configuration.
-func (c *Config) FeatureConfig() FeatureConfig {
-	return c.Features
+func (c *Config) FeatureConfig() *FeatureConfig {
+	return &c.Features
 }
 
 // RedactedConfigLog returns a string representation of the config with sensitive fields redacted.

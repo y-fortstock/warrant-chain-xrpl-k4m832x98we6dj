@@ -224,13 +224,12 @@ func (b *Blockchain) SubmitTxWithSequence(w *wallet.Wallet, tx SubmittableTransa
 	return hash, sequence, nil
 }
 
-func (b *Blockchain) SubmitTxAndWait(w *wallet.Wallet, tx SubmittableTransaction) (
-	hash string, err error) {
+func (b *Blockchain) SubmitTxAndWait(w *wallet.Wallet, tx SubmittableTransaction) error {
 	if w == nil {
-		return "", fmt.Errorf("wallet cannot be nil")
+		return fmt.Errorf("wallet cannot be nil")
 	}
 	if tx == nil {
-		return "", fmt.Errorf("transaction cannot be nil")
+		return fmt.Errorf("transaction cannot be nil")
 	}
 
 	// Access BaseTx fields directly since all transaction types embed BaseTx
@@ -238,21 +237,16 @@ func (b *Blockchain) SubmitTxAndWait(w *wallet.Wallet, tx SubmittableTransaction
 	flattenedTx["Account"] = w.ClassicAddress.String()
 	flattenedTx["SigningPubKey"] = w.PublicKey
 
-	resp, err := b.c.SubmitTxAndWait(flattenedTx, &rpctypes.SubmitOptions{
+	_, err := b.c.SubmitTxAndWait(flattenedTx, &rpctypes.SubmitOptions{
 		Autofill: true,
 		FailHard: false,
 		Wallet:   w,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to submit tx: %w", err)
+		return fmt.Errorf("failed to submit tx: %w", err)
 	}
 
-	hash = resp.Tx["hash"].(string)
-	if hash == "" {
-		return "", fmt.Errorf("hash is empty")
-	}
-
-	return hash, nil
+	return nil
 }
 
 // GetAccountInfo retrieves detailed information about an XRPL account.
@@ -539,7 +533,7 @@ func (b *Blockchain) MPTokenIssuanceCreate(issuer *wallet.Wallet, mpt MPToken) (
 	return hash, issuanceID, nil
 }
 
-func (b *Blockchain) MPTokenIssuanceDestroy(holder *wallet.Wallet, issuanceId string) (txHash string, err error) {
+func (b *Blockchain) MPTokenIssuanceDestroy(holder *wallet.Wallet, issuanceId string) error {
 	tx := &transactions.MPTokenIssuanceDestroy{
 		MPTokenIssuanceID: issuanceId,
 	}
@@ -555,7 +549,7 @@ func (b *Blockchain) MPTokenIssuanceDestroy(holder *wallet.Wallet, issuanceId st
 // - issuanceId: The ID of the token issuance to authorize
 //
 // Returns the transaction hash if successful, or an error if authorization fails.
-func (b *Blockchain) AuthorizeMPToken(w *wallet.Wallet, issuanceId string) (txHash string, err error) {
+func (b *Blockchain) AuthorizeMPToken(w *wallet.Wallet, issuanceId string) error {
 	tx := &transactions.MPTokenAuthorize{
 		MPTokenIssuanceID: issuanceId,
 	}

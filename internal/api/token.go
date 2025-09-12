@@ -31,12 +31,19 @@ type Token struct {
 
 // NewToken creates and returns a new Token API server instance.
 // It requires a logger and blockchain instance for operation.
-func NewToken(logger *slog.Logger, bc *Blockchain) *Token {
+func NewToken(logger *slog.Logger, bc *Blockchain, features *config.FeatureConfig) *Token {
+	var loans *Loans
+	if features.Loan {
+		loans = NewLoans(logger, bc)
+	} else {
+		loans = &Loans{}
+	}
+
 	return &Token{
 		logger:   logger,
 		bc:       bc,
-		features: &config.FeatureConfig{Loan: false},
-		loans:    NewLoans(logger, bc),
+		features: features,
+		loans:    loans,
 	}
 }
 
@@ -125,7 +132,7 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	}
 
 	l.Debug("authorizing token", "issuance_id", issuanceID)
-	_, err = t.bc.AuthorizeMPToken(owner, issuanceID)
+	err = t.bc.AuthorizeMPToken(owner, issuanceID)
 	if err != nil {
 		l.Warn("failed to authorize token", "error", err)
 	}
@@ -197,7 +204,7 @@ func (t *Token) Transfer(ctx context.Context, req *tokenv1.TransferRequest) (*to
 		return nil, status.Errorf(codes.InvalidArgument, "sender address does not match")
 	}
 
-	_, err = t.bc.AuthorizeMPToken(recipient, req.GetTokenId())
+	err = t.bc.AuthorizeMPToken(recipient, req.GetTokenId())
 	if err != nil {
 		l.Warn("failed to authorize token", "error", err)
 	}
