@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -530,7 +531,19 @@ func (b *Blockchain) MPTokenIssuanceCreate(issuer *wallet.Wallet, mpt MPToken) (
 		return "", "", fmt.Errorf("failed to create issuance id: %w", err)
 	}
 
-	return hash, issuanceID, nil
+	var meta transactions.TxObjMeta
+	for i := 0; i < 16; i++ {
+		time.Sleep(4 * time.Second)
+		_, meta, _, err = b.GetTransactionInfo(hash)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(meta.TransactionResult, "SUCCESS") {
+			return hash, issuanceID, nil
+		}
+	}
+
+	return hash, issuanceID, fmt.Errorf("transaction failed to confirm: %s, error: %w", meta.TransactionResult, err)
 }
 
 func (b *Blockchain) MPTokenIssuanceDestroy(holder *wallet.Wallet, issuanceId string) error {

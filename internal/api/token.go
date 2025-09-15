@@ -114,21 +114,8 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	mpt := NewWarrantMPToken(req.GetDocumentHash(), warehouse.ClassicAddress.String())
 	hash, issuanceID, err := t.bc.MPTokenIssuanceCreate(warehouse, mpt)
 	if err != nil {
-		l.Error("failed to create issuance", "error", err)
+		l.Error("failed to create issuance", "hash", hash, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to create issuance: %v", err)
-	}
-
-	for i := 0; i < 5; i++ {
-		time.Sleep(4 * time.Second)
-		_, meta, _, err := t.bc.GetTransactionInfo(hash)
-		if err != nil {
-			l.Warn("failed to get transaction info",
-				"hash", hash,
-				"error", err)
-		}
-		if strings.Contains(meta.TransactionResult, "SUCCESS") {
-			break
-		}
 	}
 
 	l.Debug("authorizing token", "issuance_id", issuanceID)
@@ -140,7 +127,7 @@ func (t *Token) Emission(ctx context.Context, req *tokenv1.EmissionRequest) (*to
 	l.Debug("transferring token to owner", "issuance_id", issuanceID)
 	hash, err = t.bc.TransferMPToken(warehouse, issuanceID, owner.ClassicAddress.String())
 	if err != nil {
-		l.Error("failed to transfer token", "error", err)
+		l.Error("failed to transfer token", "hash", hash, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to transfer token: %v", err)
 	}
 
