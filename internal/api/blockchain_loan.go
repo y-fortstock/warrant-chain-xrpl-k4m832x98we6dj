@@ -41,11 +41,11 @@ func (b *Blockchain) CreateTrustline(from, to *wallet.Wallet, amount float64) er
 }
 
 func (b *Blockchain) CreateTrustlineFromSystemAccount(to *wallet.Wallet, amount float64) error {
-	if err := b.CreateTrustline(to, b.w, 0); err != nil {
+	if err := b.CreateTrustline(b.w, to, amount); err != nil {
 		return fmt.Errorf("failed to create trustline to system account: %v", err)
 	}
 
-	return b.CreateTrustline(b.w, to, amount)
+	return b.CreateTrustline(to, b.w, 0)
 }
 
 func (b *Blockchain) PaymentRLUSDFromSystemAccount(to *wallet.Wallet, amount float64) error {
