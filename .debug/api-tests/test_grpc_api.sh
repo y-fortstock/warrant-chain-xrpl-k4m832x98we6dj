@@ -107,8 +107,8 @@ run_test() {
 # run_test "TransferToCreditor" "blockchain.token.v1.TokenAPI/TransferToCreditor" "$TRANSFER_TO_CREDITOR_REQ" "" 0
 
 # TokenAPI BuyoutFromCreditor
-BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ='{ "token_id": "005646D742ABB74F75D35DB3C9079A7864DCE9527492CFD4", "document_hash": "test_document_hash_123", "owner_address_id": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "owner_pass": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
-run_test "BuyoutFromCreditor" "blockchain.token.v1.TokenAPI/BuyoutFromCreditor" "$BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ" "" 0
+# BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ='{ "token_id": "005646D742ABB74F75D35DB3C9079A7864DCE9527492CFD4", "document_hash": "test_document_hash_123", "owner_address_id": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "owner_pass": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
+# run_test "BuyoutFromCreditor" "blockchain.token.v1.TokenAPI/BuyoutFromCreditor" "$BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ" "" 0
 
 # # TokenAPI TransferFromCreditorToWarehouse
 # TRANSFER_FROM_CREDITOR_TO_WAREHOUSE_REQ='{ "document_hash": "0056469242ABB74F75D35DB3C9079A7864DCE9527492CFD4", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
@@ -131,6 +131,10 @@ run_test "BuyoutFromCreditor" "blockchain.token.v1.TokenAPI/BuyoutFromCreditor" 
 # # 3. ResumeContract
 # RESUME_CONTRACT_REQ='{}'
 # run_test "ResumeContract" "blockchain.token.v1.TokenAPI/ResumeContract" "$RESUME_CONTRACT_REQ" "" 1
+
+# # 4. TransactionInfo
+TRANSACTION_INFO_REQ='{ "transaction_id": "7AC9D8F7452917FE69D512A41F21CF429C18C6D05F127FBD17538A7BB46E6FA8" }'
+run_test "TransactionInfo" "blockchain.token.v1.TokenAPI/TransactionInfo" "$TRANSACTION_INFO_REQ" "" 0
 
 # ---- SUMMARY ----
 echo "==== TEST SUMMARY ===="
