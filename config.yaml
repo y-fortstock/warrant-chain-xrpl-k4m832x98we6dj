@@ -12,10 +12,12 @@ network:
   # System account configuration
   system:
     # System account address
-    account: "rKxt8PgUy4ggMY53GXuqU6i2aJ2HymW2YC"
+    account: "rspQjo1QqBZsH3Kbr7Z7SbF7QGRAbWsppE"
     # System account secret (will be redacted in logs)
-    secret: "ED75207685F294BE4945908D2BBF1E535CECFB7D78A6B9AEC865F146B611DB2E51"
+    secret: "ED314A5DDC93264D2CB91E1ED92B69F9AEDB7FA14027649D3F300B462B0355DEDD"
     # System account public key
-    public: "ED80EA4365634AB2116C239CEB8F739498CEFE91FBB667FBAB6FE9B93492ED0FFC"
+    public: "EDF8E0C585E753AF306F88718CAD36968498FDC11C3B762FB8ACEAA6B3AEF59ECD"
 server:
   listen: ":8099"
+features:
+  loan: true

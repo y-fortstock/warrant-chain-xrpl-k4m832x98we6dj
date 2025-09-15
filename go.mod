@@ -10,6 +10,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/decen-one/go-bip39 v0.0.0-20230726170506-e45ab587d13e
 	github.com/google/wire v0.6.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1

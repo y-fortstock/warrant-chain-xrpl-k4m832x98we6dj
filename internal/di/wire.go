@@ -74,8 +74,8 @@ func ProvideAccountAPI(l *slog.Logger, bc *api.Blockchain) accountv1.AccountAPIS
 // - bc: The blockchain interface for XRPL network operations
 //
 // Returns a TokenAPIServer implementation.
-func ProvideTokenAPI(l *slog.Logger, bc *api.Blockchain) tokenv1.TokenAPIServer {
-	return api.NewToken(l, bc)
+func ProvideTokenAPI(l *slog.Logger, bc *api.Blockchain, features *config.FeatureConfig) tokenv1.TokenAPIServer {
+	return api.NewToken(l, bc, features)
 }
 
 // ProvideAppServer returns a new application Server using the provided logger and gRPC server.
@@ -105,7 +105,7 @@ func ProvideAppServer(l *slog.Logger, accountAPI accountv1.AccountAPIServer, tok
 // - netCfg: Network configuration for XRPL connectivity
 //
 // Returns a fully configured and wired application server.
-func InitializeServer(cfg config.LogConfig, netCfg config.NetworkConfig) *server.Server {
+func InitializeServer(cfg config.LogConfig, netCfg config.NetworkConfig, features *config.FeatureConfig) *server.Server {
 	wire.Build(
 		ProvideLogger,
 		ProvideBlockchainOrPanic,

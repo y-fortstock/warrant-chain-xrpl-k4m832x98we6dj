@@ -46,5 +46,6 @@ type TxResponse struct {
 	// TODO: Improve Meta parsing
 	Meta      any                         `json:"meta"`
 	Validated bool                        `json:"validated"`
-	Tx        transaction.FlatTransaction `json:"tx_json,omitempty"`
+	Tx        transaction.FlatTransaction `json:",omitempty"`
+	TxJson    transaction.FlatTransaction `json:"tx_json,omitempty"`
 }
