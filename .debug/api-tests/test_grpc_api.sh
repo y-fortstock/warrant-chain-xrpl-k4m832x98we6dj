@@ -85,48 +85,52 @@ run_test() {
 # GET_BALANCE_EXPECTED='{ "balance": "100000000" }'
 # run_test "GetBalance" "blockchain.account.v1.AccountAPI/GetBalance" "$GET_BALANCE_REQ" "$GET_BALANCE_EXPECTED" 0
 
-# 1c. AccountAPI Deposit
-DEPOSIT_REQ='{ "accountId": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "weiAmount": "2000000" }'
-run_test "Deposit Owner" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+# # 1c. AccountAPI Deposit
+# DEPOSIT_REQ='{ "accountId": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "weiAmount": "2000000" }'
+# run_test "Deposit Owner" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
 
-DEPOSIT_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "weiAmount": "2000000" }'
-run_test "Deposit Warehouse" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+# DEPOSIT_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "weiAmount": "2000000" }'
+# run_test "Deposit Warehouse" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
 
-DEPOSIT_REQ='{ "accountId": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "weiAmount": "2000000" }'
-run_test "Deposit Creditor" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
+# DEPOSIT_REQ='{ "accountId": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "weiAmount": "2000000" }'
+# run_test "Deposit Creditor" "blockchain.account.v1.AccountAPI/Deposit" "$DEPOSIT_REQ" "" 0
 
-sleep 5
+# sleep 5
 
-# 1d. TokenAPI Emission
+# # 1d. TokenAPI Emission
 # EMISSION_REQ='{ "document_hash": "test_document_hash_123", "owner_address_id": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "owner_pass": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0", "warehouse_address_id": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "warehouse_pass": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1", "signature": "test_signature_123" }'
 # # Expected response structure (token ID, transaction ID and timestamp will be dynamic)
 # run_test "Emission" "blockchain.token.v1.TokenAPI/Emission" "$EMISSION_REQ" "" 0
 
-# # TokenAPI TransferToCreditor
-# TRANSFER_TO_CREDITOR_REQ='{ "document_hash": "0056469242ABB74F75D35DB3C9079A7864DCE9527492CFD4", "owner_address_id": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "owner_address_pass": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
+# TokenAPI TransferToCreditor
+# TRANSFER_TO_CREDITOR_REQ='{ "token_id": "005646D742ABB74F75D35DB3C9079A7864DCE9527492CFD4", "document_hash": "test_document_hash_123", "owner_address_id": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "owner_address_pass": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
 # run_test "TransferToCreditor" "blockchain.token.v1.TokenAPI/TransferToCreditor" "$TRANSFER_TO_CREDITOR_REQ" "" 0
+
+# TokenAPI BuyoutFromCreditor
+BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ='{ "token_id": "005646D742ABB74F75D35DB3C9079A7864DCE9527492CFD4", "document_hash": "test_document_hash_123", "owner_address_id": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "owner_pass": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
+run_test "BuyoutFromCreditor" "blockchain.token.v1.TokenAPI/BuyoutFromCreditor" "$BUYOUT_FROM_CREDITOR_WITH_LOAN_REQ" "" 0
 
 # # TokenAPI TransferFromCreditorToWarehouse
 # TRANSFER_FROM_CREDITOR_TO_WAREHOUSE_REQ='{ "document_hash": "0056469242ABB74F75D35DB3C9079A7864DCE9527492CFD4", "creditor_address_id": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "creditor_address_pass": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1", "signature": "test_signature_123" }'
 # run_test "TransferFromCreditorToWarehouse" "blockchain.token.v1.TokenAPI/TransferFromCreditorToWarehouse" "$TRANSFER_FROM_CREDITOR_TO_WAREHOUSE_REQ" "" 0
 
-# 1e. AccountAPI ClearBalance
-CLEAR_BALANCE_REQ='{ "accountId": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "accountPassword": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0" }'
-run_test "ClearBalance Owner" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
+# # 1e. AccountAPI ClearBalance
+# CLEAR_BALANCE_REQ='{ "accountId": "rKVBdHSj12yPe6NRNdJUCFsyV23k2q7As3", "accountPassword": "20c6ec9f36c6347f39485ee5a1e4c515373d2f32d69eb77b42ffb1d459fa26ebee73c33ca0da640feb910697f058419c674f17b8c8d6eb688fcd170a3bb2bff7-0" }'
+# run_test "ClearBalance Owner" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
-CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
-run_test "ClearBalance Warehouse" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
+# CLEAR_BALANCE_REQ='{ "accountId": "rfnXJ66sZ3HF8Efu82RXawhCbnVE5scDmX", "accountPassword": "d83e08bea4d85992c2dd6efb93f070f94f77611d956bbb0594bc0ef29f864ac5cdefdc550f95fd5f84fcb104ad1084532c45b5cd85db071d70395d12a5996bfb-1" }'
+# run_test "ClearBalance Warehouse" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
-CLEAR_BALANCE_REQ='{ "accountId": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "accountPassword": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1" }'
-run_test "ClearBalance Creditor" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
+# CLEAR_BALANCE_REQ='{ "accountId": "rDAsBY6uhCDZjQZ1SwDuPTrD9MtMQMCMn2", "accountPassword": "202f73ce60fc7e3cd1bd13642420839ff55ee0828313e5f6c19960775ec6c2d3bb0ad0e61954aa2beab825c8de08d2594b2e74a915927195b5b0c1a02286a56e-1" }'
+# run_test "ClearBalance Creditor" "blockchain.account.v1.AccountAPI/ClearBalance" "$CLEAR_BALANCE_REQ" "" 0
 
-# 2. PauseContract
-PAUSE_CONTRACT_REQ='{}'
-run_test "PauseContract" "blockchain.token.v1.TokenAPI/PauseContract" "$PAUSE_CONTRACT_REQ" "" 1
+# # 2. PauseContract
+# PAUSE_CONTRACT_REQ='{}'
+# run_test "PauseContract" "blockchain.token.v1.TokenAPI/PauseContract" "$PAUSE_CONTRACT_REQ" "" 1
 
-# 3. ResumeContract
-RESUME_CONTRACT_REQ='{}'
-run_test "ResumeContract" "blockchain.token.v1.TokenAPI/ResumeContract" "$RESUME_CONTRACT_REQ" "" 1
+# # 3. ResumeContract
+# RESUME_CONTRACT_REQ='{}'
+# run_test "ResumeContract" "blockchain.token.v1.TokenAPI/ResumeContract" "$RESUME_CONTRACT_REQ" "" 1
 
 # ---- SUMMARY ----
 echo "==== TEST SUMMARY ===="

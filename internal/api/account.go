@@ -78,7 +78,7 @@ func (a *Account) Deposit(ctx context.Context, req *accountv1.DepositRequest) (*
 	}
 
 	l.Info("payment from system account", "dropsToTransfer", dropsToTransfer)
-	txHash, err := a.bc.PaymentFromSystemAccount(req.AccountId, dropsToTransfer)
+	txHash, err := a.bc.PaymentXRPFromSystemAccount(req.AccountId, dropsToTransfer)
 	if err != nil {
 		l.Error("failed to payment from system account",
 			"error", err,
@@ -169,7 +169,7 @@ func (a *Account) ClearBalance(ctx context.Context, req *accountv1.ClearBalanceR
 	amount := balance - (fee + reserve)
 
 	l.Info("payment to system account", "fee", fee, "reserve", reserve, "amount", amount)
-	txHash, err := a.bc.PaymentToSystemAccount(w, amount)
+	txHash, err := a.bc.PaymentXRPToSystemAccount(w, amount)
 	if err != nil {
 		l.Error("failed to payment to system account",
 			"error", err,
