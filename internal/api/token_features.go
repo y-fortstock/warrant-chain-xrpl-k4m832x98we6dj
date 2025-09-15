@@ -232,21 +232,21 @@ func (t *Token) transferToCreditorWithLoan(ctx context.Context, req *tokenv1.Tra
 		return nil, status.Errorf(codes.Internal, "failed to create trustline: %v", err)
 	}
 
-	// l.Debug("repelling RLUSD (sum of loan interest) from System Account to owner/borrower")
-	// err = t.bc.PaymentRLUSDFromSystemAccount(owner, loan.Principal.InexactFloat64()/10)
-	// if err != nil {
-	// 	// l.Warn("failed to payment RLUSD from system account", "error", err)
-	// 	l.Error("failed to payment RLUSD from system account", "error", err)
-	// 	return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
-	// }
+	l.Debug("repelling RLUSD (sum of loan interest) from System Account to owner/borrower")
+	err = t.bc.PaymentRLUSDFromSystemAccount(owner, loan.Principal.InexactFloat64()/10)
+	if err != nil {
+		// l.Warn("failed to payment RLUSD from system account", "error", err)
+		l.Error("failed to payment RLUSD from system account", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
+	}
 
-	// l.Debug("repelling RLUSD (loan body) from System Account to creditor/lender")
-	// err = t.bc.PaymentRLUSDFromSystemAccount(creditor, loan.Principal.InexactFloat64())
-	// if err != nil {
-	// 	// l.Warn("failed to payment RLUSD from system account", "error", err)
-	// 	l.Error("failed to payment RLUSD from system account", "error", err)
-	// 	return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
-	// }
+	l.Debug("repelling RLUSD (loan body) from System Account to creditor/lender")
+	err = t.bc.PaymentRLUSDFromSystemAccount(creditor, loan.Principal.InexactFloat64())
+	if err != nil {
+		// l.Warn("failed to payment RLUSD from system account", "error", err)
+		l.Error("failed to payment RLUSD from system account", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to payment RLUSD from system account: %v", err)
+	}
 
 	l.Debug("minting debt token")
 	debtToken := NewDebtMPToken(tokenID, owner.ClassicAddress.String(), creditor.ClassicAddress.String())
