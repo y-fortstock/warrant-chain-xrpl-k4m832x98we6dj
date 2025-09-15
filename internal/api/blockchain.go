@@ -296,7 +296,7 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 	if txResp.Meta == nil {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("metadata is nil")
 	}
-	if len(txResp.Tx) == 0 {
+	if len(txResp.TxJson) == 0 {
 		// Check if this is a "not found" case by looking at the response
 		if txResp.LedgerIndex == 0 && !txResp.Validated {
 			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("transaction not found or not yet confirmed")
@@ -324,23 +324,23 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 	}
 
 	// Safely extract fields from transaction with type assertions
-	account, ok := txResp.Tx["Account"].(string)
+	account, ok := txResp.TxJson["Account"].(string)
 	if !ok {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Account from transaction")
 	}
 
 	// Try different types for Fee
 	var fee float64
-	if feeFloat, ok := txResp.Tx["Fee"].(float64); ok {
+	if feeFloat, ok := txResp.TxJson["Fee"].(float64); ok {
 		fee = feeFloat
-	} else if feeString, ok := txResp.Tx["Fee"].(string); ok {
+	} else if feeString, ok := txResp.TxJson["Fee"].(string); ok {
 		// Try to parse string to float64
 		if parsedFee, err := strconv.ParseFloat(feeString, 64); err == nil {
 			fee = parsedFee
 		} else {
 			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Fee string '%s': %w", feeString, err)
 		}
-	} else if feeNumber, ok := txResp.Tx["Fee"].(json.Number); ok {
+	} else if feeNumber, ok := txResp.TxJson["Fee"].(json.Number); ok {
 		// Try to parse json.Number to float64
 		if parsedFee, err := feeNumber.Float64(); err == nil {
 			fee = parsedFee
@@ -353,18 +353,18 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for Flags
 	var flags float64
-	if txResp.Tx["Flags"] == nil {
+	if txResp.TxJson["Flags"] == nil {
 		// Flags can be nil if not set
 		flags = 0
-	} else if flagsFloat, ok := txResp.Tx["Flags"].(float64); ok {
+	} else if flagsFloat, ok := txResp.TxJson["Flags"].(float64); ok {
 		flags = flagsFloat
-	} else if flagsString, ok := txResp.Tx["Flags"].(string); ok {
+	} else if flagsString, ok := txResp.TxJson["Flags"].(string); ok {
 		if parsedFlags, err := strconv.ParseFloat(flagsString, 64); err == nil {
 			flags = parsedFlags
 		} else {
 			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Flags string '%s': %w", flagsString, err)
 		}
-	} else if flagsNumber, ok := txResp.Tx["Flags"].(json.Number); ok {
+	} else if flagsNumber, ok := txResp.TxJson["Flags"].(json.Number); ok {
 		if parsedFlags, err := flagsNumber.Float64(); err == nil {
 			flags = parsedFlags
 		} else {
@@ -376,18 +376,18 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for LastLedgerSequence
 	var lastLedgerSeq float64
-	if txResp.Tx["LastLedgerSequence"] == nil {
+	if txResp.TxJson["LastLedgerSequence"] == nil {
 		// LastLedgerSequence can be nil if not set
 		lastLedgerSeq = 0
-	} else if lastLedgerSeqFloat, ok := txResp.Tx["LastLedgerSequence"].(float64); ok {
+	} else if lastLedgerSeqFloat, ok := txResp.TxJson["LastLedgerSequence"].(float64); ok {
 		lastLedgerSeq = lastLedgerSeqFloat
-	} else if lastLedgerSeqString, ok := txResp.Tx["LastLedgerSequence"].(string); ok {
+	} else if lastLedgerSeqString, ok := txResp.TxJson["LastLedgerSequence"].(string); ok {
 		if parsedLastLedgerSeq, err := strconv.ParseFloat(lastLedgerSeqString, 64); err == nil {
 			lastLedgerSeq = parsedLastLedgerSeq
 		} else {
 			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse LastLedgerSequence string '%s': %w", lastLedgerSeqString, err)
 		}
-	} else if lastLedgerSeqNumber, ok := txResp.Tx["LastLedgerSequence"].(json.Number); ok {
+	} else if lastLedgerSeqNumber, ok := txResp.TxJson["LastLedgerSequence"].(json.Number); ok {
 		if parsedLastLedgerSeq, err := lastLedgerSeqNumber.Float64(); err == nil {
 			lastLedgerSeq = parsedLastLedgerSeq
 		} else {
@@ -399,18 +399,18 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 
 	// Try different types for Sequence
 	var sequence float64
-	if txResp.Tx["Sequence"] == nil {
+	if txResp.TxJson["Sequence"] == nil {
 		// Sequence should not be nil, but handle it gracefully
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("sequence is required but was nil")
-	} else if sequenceFloat, ok := txResp.Tx["Sequence"].(float64); ok {
+	} else if sequenceFloat, ok := txResp.TxJson["Sequence"].(float64); ok {
 		sequence = sequenceFloat
-	} else if sequenceString, ok := txResp.Tx["Sequence"].(string); ok {
+	} else if sequenceString, ok := txResp.TxJson["Sequence"].(string); ok {
 		if parsedSequence, err := strconv.ParseFloat(sequenceString, 64); err == nil {
 			sequence = parsedSequence
 		} else {
 			return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to parse Sequence string '%s': %w", sequenceString, err)
 		}
-	} else if sequenceNumber, ok := txResp.Tx["Sequence"].(json.Number); ok {
+	} else if sequenceNumber, ok := txResp.TxJson["Sequence"].(json.Number); ok {
 		if parsedSequence, err := sequenceNumber.Float64(); err == nil {
 			sequence = parsedSequence
 		} else {
@@ -420,17 +420,17 @@ func (b *Blockchain) GetTransactionInfo(hash string) (
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract Sequence from transaction, got type: %T", txResp.Tx["Sequence"])
 	}
 
-	signingPubKey, ok := txResp.Tx["SigningPubKey"].(string)
+	signingPubKey, ok := txResp.TxJson["SigningPubKey"].(string)
 	if !ok {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract SigningPubKey from transaction")
 	}
 
-	transactionType, ok := txResp.Tx["TransactionType"].(string)
+	transactionType, ok := txResp.TxJson["TransactionType"].(string)
 	if !ok {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract TransactionType from transaction")
 	}
 
-	txnSignature, ok := txResp.Tx["TxnSignature"].(string)
+	txnSignature, ok := txResp.TxJson["TxnSignature"].(string)
 	if !ok {
 		return nil, transactions.TxObjMeta{}, nil, fmt.Errorf("failed to extract TxnSignature from transaction")
 	}
