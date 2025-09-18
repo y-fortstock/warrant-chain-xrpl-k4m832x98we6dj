@@ -1,3 +1,6 @@
+⚠️ This repository is public but not discoverable.  
+Please do not share the link publicly. It is intended only for XRPL reviewers.
+
 # chain-xrpl
 
 A comprehensive Go-based microservice that provides enterprise-grade gRPC APIs for XRPL (XRP Ledger) blockchain operations, specifically designed for warrant and asset-backed token management systems.
