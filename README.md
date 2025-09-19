@@ -1,6 +1,9 @@
 ⚠️ This repository is public but not discoverable.  
 Please do not share the link publicly. It is intended only for XRPL reviewers.
 
+[Open PDF: warrant-WGHME00000037](./warrant-WGHME00000037.pdf)
+
+
 ```mermaid
 sequenceDiagram
     participant Borrower
