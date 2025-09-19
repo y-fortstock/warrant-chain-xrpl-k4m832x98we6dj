@@ -2,7 +2,7 @@
 Please do not share the link publicly. It is intended only for XRPL reviewers.
 
 [Open PDF: warrant-WGHME00000037](./warrant-WGHME00000037.pdf)
-
+[Open PDF: endorsements-WGHME00000037](./endorsements-WGHME00000037.pdf)
 
 ```mermaid
 sequenceDiagram
