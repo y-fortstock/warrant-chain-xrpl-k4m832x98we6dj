@@ -1,6 +1,64 @@
 ⚠️ This repository is public but not discoverable.  
 Please do not share the link publicly. It is intended only for XRPL reviewers.
 
+```mermaid
+sequenceDiagram
+    participant Borrower
+    participant Lender
+    participant FortstockPlatform as Fortstock<br>Platform Logic <br> Operator account
+    participant Warehouse
+
+    Note over Borrower, Lender: Account funding and configuration
+    FortstockPlatform->>Warehouse: Fund with XRP
+    FortstockPlatform->>Borrower: Fund with XRP
+    FortstockPlatform->>Lender: Fund with XRP
+
+    Note over Borrower, Warehouse: Minting MPT Warrant
+
+    Warehouse->>Warehouse: Minting MPT Warrant
+    Borrower->>Borrower: Authorization MPT token
+    Warehouse->>Borrower: Submitting MPT Warrant to GoodsOwner
+
+    Note over  Borrower, FortstockPlatform : Loan Demand And Matching <br> everithing precoded <br> Amount 1 mln RLUSD <br> Time 3 days <br> Annual rate 36.5% <br> Daily payment 0.1% 
+
+
+    Note over Borrower, FortstockPlatform:Deployment
+    Borrower->>Borrower: Mint Debt MPT token<br>with loan parameters
+    Lender->>Lender: Authorization Debt MPT
+    Borrower->>Lender: Sent Debt MPT token<br>with loan parameters
+    Lender->>Lender: Authorization Warrant MPT
+    Borrower->>Lender: Send Warrant MPT token<br>to Lender address
+    
+    Lender->>Borrower: Send RLUSD (loan amount)<br>to Borrower address
+
+
+    Note over Borrower, FortstockPlatform: Interest Tracking
+    loop Monthly
+        Borrower->>Lender: Send interest to Lender<br>based on Debt Token
+        Borrower-->>FortstockPlatform: Send Fortstock reward<br> not coded
+    end
+
+    alt Loan Repaid
+        Borrower->>Lender: Repay full loan in RLUSD
+        Lender->>Borrower: return Debt MPT token
+        Borrower->>Borrower: Burn Debt MPT token
+        Lender->>Borrower: Return Warrant MPT token
+        Borrower->>Warehouse: Return Warrant MPT token
+        Warehouse->>Warehouse: Burn Warrant MPT token
+    else Default
+        Lender->>Borrower: return Debt MPT token
+
+        Borrower->>Borrower: Burn Debt MPT token
+        Note over Lender: Warrant MPT becomes transferable<br>to third parties
+                Lender->>Warehouse: Return Warrant MPT token
+                        Warehouse->>Warehouse: Burn Warrant MPT token
+
+
+    end
+```
+
+
+
 # chain-xrpl
 
 A comprehensive Go-based microservice that provides enterprise-grade gRPC APIs for XRPL (XRP Ledger) blockchain operations, specifically designed for warrant and asset-backed token management systems.
